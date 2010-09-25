@@ -116,10 +116,13 @@ def GetContourFromSubArray(subArr):
         
     return contour,turns
 
-def GetContour(arr,val):
-    b=GetBoundingRect(arr,val)
+def GetContour(arr,val,boundingRect=None):
+    if boundingRect==None:
+        b=GetBoundingRect(arr,val)
+    else:
+        b=boundingRect
     subArr=arr[b[0][0]:b[0][1]+1,b[1][0]:b[1][1]+1]
-    return GetContourFromSubArray(subArr)
+    return GetContourFromSubArray(subArr==val)
 
 def GetCornersSub(cornerList):
     count=[0]
@@ -135,11 +138,11 @@ def GetCornersSub(cornerList):
     cornersSub = sum([(i+1)/2 for i in count])
     return cornersSub
 
-def GetIJPerimeter(arr,val):
-    contour,turns=GetContour(arr,val)
+def GetIJPerimeter(arr,val,boundingRect=None):
+    contour,turns=GetContour(arr,val,boundingRect=boundingRect)
     perimeter=len(contour)-1 # Because first and last point are the same
     cornersSubtract = GetCornersSub(turns)
-    print perimeter,cornersSubtract
+    #print perimeter,cornersSubtract
     return perimeter - cornersSubtract*(2-sqrt(2))
 
 def PlotArrayAndContour(arr,val):
