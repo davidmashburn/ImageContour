@@ -44,12 +44,15 @@ def indA(arr,p):
     else:
         return 0
 
-def GetContourFromSubArray(subArr):
+def GetContourFromSubArray(subArr,realArr=None,offsets=None,getSubsections=False):
     # Find the first nonzero value on row 0 and set the contour to the right
     for i,p in enumerate(subArr[0]):
         if p==1:
             direction=directions.right
             contour=[[0,i],addP([0,i],direction)]
+            if getSubsections:
+                contourVal = []
+                lastContourVal = indA(realArr,[offsets[0],i-1+offsets[1]])
             break
     # By definition there has to be a turn by the first point
     turns=[1] # 1 if turn, 0 if straight
@@ -93,6 +96,9 @@ def GetContourFromSubArray(subArr):
             print 'contour should be 0 on the outside and 1 on the inside!!'
             return
         
+        if getSubsections:
+            contourVal += [indA( realArr, [zerozy[0]+offsets[0],zerozy[1]+offsets[1]] )]
+        
         # if L==1:
         #     Turn Left
         # elif R==1:
@@ -110,21 +116,31 @@ def GetContourFromSubArray(subArr):
             turns+=[1]
         contour+=[addP(contour[-1],direction)]
         perimeter+=1
-        if perimeter==1000000:
+        if perimeter > 1000000:
             print 'Error! Perimeter Should not be this large!!!'
             return
-        
-    return contour,turns
+    
+    if getSubsections:
+        contourVal += [lastContourVal]  
+        return contour,turns,contourVal
+    else:
+        return contour,turns
 
-def GetContour(arr,val,boundingRect=None):
+def GetContour(arr,val,boundingRect=None,byNeighbor=False):
     if boundingRect==None:
         b=GetBoundingRect(arr,val)
     else:
         b=boundingRect
     subArr=arr[b[0][0]:b[0][1]+1,b[1][0]:b[1][1]+1]
-    return GetContourFromSubArray(subArr==val)
+    if byNeighbor:
+        # return 3 parameters
+        return GetContourFromSubArray(subArr==val,realArr=arr,offsets=[b[0][0],b[1][0]],
+                                                  getSubsections=True)
+    else:
+        # return 2 parameters
+        return GetContourFromSubArray(subArr==val)
 
-def GetCornersSub(cornerList):
+def GetCornersSub(cornerList,useWrap=True):
     count=[0]
     for i in cornerList:
         if i==0:
@@ -133,9 +149,12 @@ def GetCornersSub(cornerList):
         else:
             count[-1]+=1
     if count[-1]>0:
-        count[0]+=count[-1]
+        if useWrap:
+            count[0]+=count[-1]
+        else:
+            count+=[0] # make sure to just delete the 0...
     del(count[-1])
-    cornersSub = sum([(i+1)/2 for i in count])
+    cornersSub = sum([(i+1)//2 for i in count])
     return cornersSub
 
 def GetIJPerimeter(arr,val,boundingRect=None):
@@ -144,6 +163,74 @@ def GetIJPerimeter(arr,val,boundingRect=None):
     cornersSubtract = GetCornersSub(turns)
     #print perimeter,cornersSubtract
     return perimeter - cornersSubtract*(2-sqrt(2))
+
+def GetPerimeterByNeighborVal(arr,val,boundingRect=None):
+    contour,turns,vals=GetContour(arr,val,boundingRect=boundingRect,byNeighbor=True)
+    oldVal=None
+    perimeterList = []
+    turnsList = []
+    perimeterVals = []
+    for i in range(len(turns)):
+        if vals[i]==oldVal:
+            perimeterList[-1]+=1
+            turnsList[-1].append(turns[i])
+        else:
+            perimeterList.append(1)# length 1 to start...
+            turnsList.append([turns[i]])
+            perimeterVals.append(vals[i])
+            oldVal = vals[i]
+    
+    if perimeterVals[0]==perimeterVals[-1]:
+        perimeterList[0]+=perimeterList[-1]
+        del(perimeterList[-1])
+        del(perimeterVals[-1])
+        turnsList[0] = turnsList[-1] + turnsList[0]
+    
+    for i in range(len(perimeterList)):
+        turnsList[i][0]=0  # Insist that the endpoints for each segment NOT be considered corners...
+        turnsList[i][-1]=0 # This WILL change the overall length of the total perimeter,
+                           # so Watch Out!!!
+        cornersSubtract = GetCornersSub(turnsList[i],useWrap=False)
+        perimeterList[i] -= cornersSubtract*(2-sqrt(2))
+    
+    return perimeterVals,perimeterList
+
+# Pick out one contour from a byNeighbor GetContour
+def GetBoundaryLine(arr,v1,v2):
+    [xmin,xmax],[ymin,ymax] = GetBoundingRect(arr,v1)
+    contours,turns,contourVals = GetContour(arr,v1,byNeighbor=True)
+    for i in range(len(contours)):
+        #for j in range(len(contours[i])):
+            contours[i][0] +=  xmin
+            contours[i][1] +=  ymin
+    
+    contourValOld=None
+    c2=[]
+    c2ind=[]
+    c2v = []
+    for i,v in enumerate(contourVals):
+        if v!=contourValOld:
+            start = i
+            c2ind.append([start,start])
+            c2v.append([v1,contourVals[i]])
+            contourValOld=contourVals[i]
+        c2ind[-1][-1]+=1
+    
+    joinLast=False
+    if len(c2v)>1:
+        if c2v[0][1]==v2 and c2v[0][1]==c2v[-1][1]:
+            joinLast = True
+        
+    
+    for i in range(len(c2ind)):
+        if v1 in c2v[i] and v2 in c2v[i]:
+            c2.append(contours[c2ind[i][0]:c2ind[i][1]+1])
+    
+    if joinLast:
+        c2[0] = c2[-1][:-1]+c2[0]
+        del(c2[-1])
+    
+    return c2
 
 def PlotArrayAndContour(arr,val):
     [[xmin,xmax],[ymin,ymax]] = GetBoundingRect(arr,val)
