@@ -1,6 +1,6 @@
 import numpy as np
 from numpy import sqrt
-import pylab
+import matplotlib.pyplot as plt
 
 def GetBoundingRect(arr,val):
     x,y=np.where(arr==val)
@@ -260,11 +260,11 @@ def PlotArrayAndContour(arr,val):
     [[xmin,xmax],[ymin,ymax]] = GetBoundingRect(arr,val)
     contour = GetContour(arr,val)[0]
     npc = np.array(contour)
-    pylab.cla()
-    pylab.imshow(arr,cmap=pylab.cm.jet,interpolation='nearest')
-    pylab.plot(npc[:,1]-0.5+ymin,npc[:,0]-0.5+xmin,'yo-')
-    pylab.xlim(-1,arr.shape[1])
-    pylab.ylim(arr.shape[0],-1)
+    plt.cla()
+    plt.imshow(arr,cmap=plt.cm.jet,interpolation='nearest')
+    plt.plot(npc[:,1]-0.5+ymin,npc[:,0]-0.5+xmin,'yo-')
+    plt.xlim(-1,arr.shape[1])
+    plt.ylim(arr.shape[0],-1)
 
 if __name__=='__main__':
     z=np.zeros([10,10])
@@ -280,8 +280,8 @@ if __name__=='__main__':
                 [0,1,1,1,0]])
     print GetIJPerimeter(z,1)
     print GetIJPerimeter(q,1)
-    pylab.figure(1)
+    plt.figure(1)
     PlotArrayAndContour(z,1)
-    pylab.figure(2)
+    plt.figure(2)
     PlotArrayAndContour(q,1)
     import DelayApp
