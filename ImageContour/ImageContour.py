@@ -121,7 +121,7 @@ def GetContourFromSubArray(subArr,realArr=None,offsets=None,getSubsections=False
             return
     
     if getSubsections:
-        contourVal += [lastContourVal]  
+        contourVal += [lastContourVal]
         return contour,turns,contourVal
     else:
         return contour,turns
@@ -255,6 +255,93 @@ def GetBoundaryLine(arr,v1,v2):
         del(c2[-1])
     
     return c2
+
+def AdjustPointsAwayFromLine(points,d,pinch,usePlot=False):
+    xy=points
+    x,y = xy.T
+    dxy = xy[1:]-xy[:-1]
+    dx,dy = dxy.T
+    l = np.sqrt(dx**2+dy**2)
+    
+    # Some control points for calculating intersections...
+    xyls = np.array([ x[:-1] - dy/l*d, y[:-1] + dx/l*d ]).T # Set of points to the left of the starting point of each segment
+    xyle = np.array([ x[1:] - dy/l*d, y[1:] + dx/l*d ]).T   # Set of points to the left of the ending point of each segment
+    xyrs = np.array([ x[:-1] + dy/l*d, y[:-1] - dx/l*d ]).T # Set of points to the right of the starting point of each segment
+    xyre = np.array([ x[1:] + dy/l*d, y[1:] - dx/l*d ]).T   # Set of points to the right of the ending point of each segment
+
+    xls,yls = xyls.T
+    xle,yle = xyle.T
+    xrs,yrs = xyrs.T
+    xre,yre = xyre.T
+    
+    # Simply uses all points, interleaved -- no good: stuff crosses too much
+    #xyl_inter = np.array([xyls.T,xyle.T]).transpose(2,0,1).reshape([len(xyls)*2,2]).T
+    #xyr_inter = np.array([xyrs.T,xyre.T]).transpose(2,0,1).reshape([len(xyrs)*2,2]).T
+    
+    # Picks the central point between the interior start and end points -- no good, points could easily overlap and set off the "xy match" problem in converting for VFM
+    #xyl_avg = (np.append(xyls,xyle[-1:],0)+np.append(xyls[:1],xyle,0))/2
+    #xyr_avg = (np.append(xyrs,xyre[-1:],0)+np.append(xyrs[:1],xyre,0))/2
+
+    # Newer solution is to calculate the intersection of lines xyls[i]->xyle[i] and xyls[i+1]->xyle[i+1] (See math below)
+    def CalculateCornerPointsFromStartAndEndPoints(starts,ends):
+        '''Takes 2 sets of points, starts and ends and computes the intersections between
+           all adjecent pairs of lines:  starts[i]->ends[i] intersecting starts[i+1]->ends[i+1]
+           Then, it takes returns a new set of points: [starts[0], corners..., ends[-1]]'''
+        # Does some "magic" linear algebra that works out to the solution of the intersections:
+        # This lives inside AdjustPointsAwayFromLine just to cut down on namespace pollution; it's really only useful in here anyway...
+        deltas           = ends - starts
+        deltaJoin       = np.array([deltas[:-1],deltas[1:]]).transpose(1,2,0) # places the first axis at the end
+        
+        startDeltaCross = np.cross( (starts[:-1],starts[1:]),(deltas[:-1],deltas[1:]) )
+        deltaCross      = np.cross(deltas[1:],deltas[:-1])
+        
+        startDeltaCrossRepeat = np.repeat( startDeltaCross.T[:,None],2,axis=1) # repeat the array twice
+        deltaCrossRepeat      = np.repeat( deltaCross[:,None] ,2,axis=1) # make it the same size as the other arrays
+        
+        corners = np.cross(startDeltaCrossRepeat,deltaJoin) / deltaCrossRepeat
+        
+        newPoints = starts[:1].tolist() + corners.tolist() + ends[-1:].tolist()
+        return newPoints
+    
+    # The older clunkier (and possibly clearer :P ) way to do it...
+    #mult = np.zeros([len(diffs)-1,2])
+    #corners = np.zeros([len(diffs)-1,2])
+    #for i in range(len(starts)-1):
+    #    mult[i] = np.cross((starts[i],starts[i+1]),(diffs[i],diffs[i+1]))
+    #    corners[i] = np.cross(mult[i],np.array([diffs[i],diffs[i+1]]).T) / denom[i]
+    newPointsL = CalculateCornerPointsFromStartAndEndPoints(xyls,xyle)
+    newPointsR = CalculateCornerPointsFromStartAndEndPoints(xyrs,xyre)
+    
+    if pinch:
+        numPts = len(x)
+        if numPts%2==0: # even number of pts; pinch point is at the midpoint of a segment
+            pinchPoint = ( xy[numPts//2-1] + xy[numPts//2] ) / 2
+            newPointsL.insert(numPts//2,pinchPoint)
+            newPointsR.insert(numPts//2,pinchPoint)
+        else:           # odd number of pts; pinch point is at an existing node
+            pinchPoint = xy[numPts//2]
+            newPointsL[numPts//2] = pinchPoint
+            newPointsR[numPts//2] = pinchPoint
+
+    if usePlot:
+        for i in range(len(dx)):
+            plt.arrow(x[i], y[i], dx[i], dy[i],'k-',length_includes_head=True,head_width=0.05,facecolor='k',edgecolor='k')
+        
+        def point_plot(arr,*args,**kwds):
+            arr = np.array(arr)
+            return plt.plot(arr[:,0],arr[:,1],*args,**kwds)
+        
+        point_plot(xyls,'ro')
+        point_plot(xyle,'rx')
+        point_plot(xyrs,'go')
+        point_plot(xyre,'gx')
+        point_plot(newPointsL,'mo-')
+        point_plot(newPointsR,'bo-')
+            #dplot(xyp_avg,'b-')
+            #dplot(xym_avg,'y-')
+        plt.axis('equal')
+    
+    return newPointsL,newPointsR
 
 def PlotArrayAndContour(arr,val):
     [[xmin,xmax],[ymin,ymax]] = GetBoundingRect(arr,val)
