@@ -9,7 +9,7 @@ setup(
     scripts=[],
     url='http://pypi.python.org/pypi/ImageContour/',
     license='LICENSE.txt',
-    description='',
+    description='construct and use linear paths around simply-connected binary and greyscale images',
     long_description=open('README.rst').read(),
     install_requires=[
                       'numpy>=1.0',
