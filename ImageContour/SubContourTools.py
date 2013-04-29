@@ -9,7 +9,6 @@ import matplotlib.pyplot as plt
 
 import ImageContour
 
-
 #from list_utils:
 from np_utils import totuple,interpGen,flatten,ziptranspose
 #from np_utils:
@@ -796,7 +795,7 @@ def GetMatchedCellNetworksCollapsingWithLimitedPoints(cnA,cnB,splitLength=1,fixe
     
     return cnALim,cnBLim
 
-def GetCVDListStatic( waterArr,d,vfmParameters,
+def GetCVDListStatic( waterArr,d,useStaticAnalysis,
                       extraRemoveValsByFrame=[],splitLength=20, fixedNumInteriorPoints=None,
                       usePlot=False,forceRemake=False ):
     '''Get cvdLists from a waterArr, ignoring any differences between frames. This function:
@@ -811,7 +810,7 @@ def GetCVDListStatic( waterArr,d,vfmParameters,
     allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
     
     # Ensure we're doing a static analysis
-    assert vfmParameters.useStaticAnalysis, 'useStaticAnalysis is not set! Did you mean to use the function GetMatchedCVDListPrevNext?'
+    assert useStaticAnalysis, 'useStaticAnalysis is not set! Did you mean to use the function GetMatchedCVDListPrevNext?'
     # Ensure we got a list-of-lists for extraRemovalsByFrame
     assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     # Ensure that this has enough elements, if not, add more empty lists
@@ -860,7 +859,7 @@ def GetCVDListStatic( waterArr,d,vfmParameters,
     
     return cvdList
 
-def GetMatchedCVDListPrevNext( waterArr,d,vfmParameters,
+def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
                                extraRemoveValsByFrame=[],splitLength=20, fixedNumInteriorPoints=None,
                                usePlot=False,forceRemake=False ):
     '''Get matched before and after cvdLists from a waterArr. This function:
@@ -879,7 +878,7 @@ def GetMatchedCVDListPrevNext( waterArr,d,vfmParameters,
     allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
     
     # Ensure we're doing a dynamic analysis (if you just want to get rid of viscous effects, set viscosityTimeStepRatio to 0)
-    assert not vfmParameters.useStaticAnalysis, 'useStaticAnalysis is set! Did you mean to use the function GetCVDListStatic?'
+    assert not useStaticAnalysis, 'useStaticAnalysis is set! Did you mean to use the function GetCVDListStatic?'
     # Ensure we got a list-of-lists for extraRemovalsByFrame
     assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     # Ensure that this has enough elements, if not, add more empty lists
@@ -1000,4 +999,3 @@ def ContourPlotFromCVLS(cVLSByFrame,frame=0):
     for cvls in cVLSByFrame[frame]:
         cvls=np.array(cvls[2])
         _=plt.plot( cvls[:,0], cvls[:,1] )
-
