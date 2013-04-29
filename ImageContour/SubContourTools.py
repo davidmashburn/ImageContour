@@ -882,7 +882,7 @@ def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
     # Ensure we got a list-of-lists for extraRemovalsByFrame
     assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     # Ensure that this has enough elements, if not, add more empty lists
-    extraRemoveValsByFrame += [[] for i in range(len(waterArr)-1-len(extraRemoveValsByFrame))]
+    extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
     
     cnListPrevAndNextFile = os.path.join(d,'cellNetworksListPrevAndNext.pickle') # Saved cellNetworks file
     
