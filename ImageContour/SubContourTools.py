@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-''''A useful collection of helper functions for SWS'''
+''''A useful collection of tools to aid in manipulating contour networks
+This is admittedly less coherent/documented and more "bleeding edge" than ImageContour.py'''
+
 import os
 from copy import deepcopy
 import cPickle
