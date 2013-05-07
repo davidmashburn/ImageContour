@@ -5,6 +5,8 @@ This is admittedly less coherent/documented and more "bleeding edge" than ImageC
 import os
 from copy import deepcopy
 import cPickle
+import itertools
+import operator
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -415,153 +417,12 @@ class CellNetwork:
             self.RemoveSubContour(i,useSimpleRemoval,leaveTinyFlipFlopContour)
         self.CleanUpEmptySubContours()
     
-    def FindMatchesAndRemovals(self,other,searchInds=None): # "other" is a different CellNetwork
-        '''Check all the subContours to see if they have a match in 'other' and return them
-           Also check for flipped matches; in the event of a flip, both sc's are flagged for
-           removal and these lists are also returned
-           State: Access only'''
-        if other.__class__!=self.__class__:
-            raise TypeError('other must be a CellNetwork!')
-        
-        if other==self:
-            raise ValueError('other must be a different object!')
-        
-        matchedInOther = []
-        removeFromSelf = []
-        removeFromOther = []
-        notRecoverable = []
-        
-        if searchInds==None:
-            searchInds = range(len(self.subContours))
-        
-        for ind in searchInds:
-            sc = self.subContours[ind]
-            # get the values connected to the subcontour only at the corners
-            opposingValues = sc.cornerConnections()
-            
-            # Look for matches between this sc in A and a sc (or possibly a 4-junction) in B with various properties...
-            keepSearching = True
-            collapse = False
-            
-            # 1: look for a subContour that has the same values and the same start/end point values
-            if keepSearching:
-                matchTuples = [ (i,scOther)
-                               for i,scOther in enumerate(other.subContours)
-                               if ( sc.values==scOther.values and
-                                    ( [sc.startPointValues,sc.endPointValues]==[scOther.startPointValues,scOther.endPointValues] or
-                                      [sc.startPointValues,sc.endPointValues]==[scOther.endPointValues,scOther.startPointValues] ) ) ]
-                matchInds,matches = ([],[]) if matchTuples==[] else zip(*matchTuples)
-                if len(matches)==1:
-                    # silent match
-                    matchedInOther.append(matchInds[0])
-                    keepSearching = False
-                elif len(matches)>1:
-                    print 'Not recoverable'
-                    print "sc in A matches multiple sc's in B with the same start/end point values:",sc.values,matches
-                    keepSearching = False
-            # 2: look for a subContour that has the same values and either one or the other same start/end point values
-            if keepSearching:
-                matchTuples = [ (i,scOther)
-                               for i,scOther in enumerate(other.subContours)
-                               if ( sc.values==scOther.values and
-                                    ( (sc.startPointValues in [scOther.startPointValues,scOther.endPointValues]) or
-                                      (sc.endPointValues in [scOther.endPointValues,scOther.startPointValues]) ) ) ]
-                matchInds,matches = ([],[]) if matchTuples==[] else zip(*matchTuples)
-                if len(matches)==1:
-                    # silent match
-                    matchedInOther.append(matchInds[0])
-                    keepSearching = False
-                elif len(matches)>1:
-                    print 'Not recoverable'
-                    print "sc in A matches multiple sc's in B with one common endpoint:",sc.values,matches
-                    keepSearching = False
-            # 3: look for a subContour that has the same values without the same start/endpoints
-            if keepSearching:
-                matchTuples = [ (i,scOther)
-                               for i,scOther in enumerate(other.subContours)
-                               if sc.values==scOther.values ]
-                matchInds,matches = ([],[]) if matchTuples==[] else zip(*matchTuples)
-                if len(matches)==1:
-                    # silent match
-                    matchedInOther.append(matchInds[0])
-                    keepSearching = False
-                elif len(matches)>1:
-                    print 'Not recoverable'
-                    print "sc in A matches multiple sc's in B without common start/endpoints:",sc.values,matches
-                    keepSearching = False
-            
-            # 4: look for a subContour that has opposing values (values = other's cornerValues and vice versa)
-            if keepSearching:
-                matchTuples = [ (i,scOther)
-                               for i,scOther in enumerate(other.subContours)
-                               if sc.values==scOther.cornerConnections() and opposingValues==scOther.values ]
-                matchInds,matches = ([],[]) if matchTuples==[] else zip(*matchTuples)
-                if len(matches)==1:
-                    print 'Recoverable: sc in A at index',ind,sc.values,'matches to sc in B at index',matchInds[0],matches[0].values
-                    matchedInOther.append(matchInds[0])
-                    removeFromSelf.append(ind)        # actually DO the removals later so we don't muck up the indexing!
-                    removeFromOther.append(matchInds[0])
-                    keepSearching = False
-                    collapse=True
-                elif len(matches)>1:
-                    print 'Not recoverable'
-                    print "sc in A matches multiple sc's in B with flip-flopped values:",sc.values,matches
-                    keepSearching = False
-            
-            # 5: look for a subContour that has either of the opposing values (values = other cornerValues OR vice versa)
-            if keepSearching:
-                matchTuples = [ (i,scOther)
-                               for i,scOther in enumerate(other.subContours)
-                               if sc.values==scOther.cornerConnections() or opposingValues==scOther.values ]
-                matchInds,matches = ([],[]) if matchTuples==[] else zip(*matchTuples)
-                if len(matches)==1:
-                    print 'Recoverable: sc in A at index',ind,sc.values,'matches to sc in B at index',matchInds[0],matches[0].values
-                    matchedInOther.append(matchInds[0])
-                    removeFromSelf.append(ind)        # actually DO the removals later so we don't muck up the indexing!
-                    removeFromOther.append(matchInds[0])
-                    keepSearching = False
-                    collapse=True
-                elif len(matches)>1:
-                    print 'Not recoverable'
-                    print "sc in A matches multiple sc's in B with flip-flopped values (OR):",sc.values,matches
-                    keepSearching = False
-            
-            # 6: look for a subContour that collapsed to a 4-junction
-            if keepSearching:
-                allValuesAroundSC = tuple(sorted(set(sc.startPointValues+sc.endPointValues)))
-                matches = [ q for q in other.quadPoints
-                              if q.values==allValuesAroundSC ] # Check to see if this sc collapsed into a 4-junction
-                if len(matches)==1:
-                    #print 'Recoverable: sc in A at index',ind,sc.values,'collapsed into a 4-junction with values',quadPointMatches[0].values,'at',quadPointMatches[0].point
-                    removeFromSelf.append(ind)        # actually DO the removals later so we don't muck up the indexing!
-                    keepSearching = False
-                    collapse=True
-                elif len(matches)>1:
-                    print 'Not recoverable'
-                    print "sc in A matches multiple 4-junctions in B:",sc.values,matches
-                    keepSearching = False
-            
-            # We failed to find the sc in B
-            if keepSearching:
-                print 'Not Recoverable! No matches found'
-                notRecoverable.append(sc.values)
-            
-            # Also check all the start and end points:
-            # This stuff isn't really being used right now...
-            #sp1, sp2 = sc.startPointValues, matches[0].startPointValues
-            #if sp1!=sp2:
-            #    print "start points don't match",sp1,sp2
-            #ep1, ep2 = sc.endPointValues, matches[0].endPointValues
-            #if ep1!=ep2:
-            #    print "end points don't match",ep1,ep2
-        
-        return matchedInOther,removeFromSelf,removeFromOther,notRecoverable
-    
     def scPlot(self,*args,**kwds):
         '''Plot the subContours in a way that can be overlaid on an imshow
            State: Access only'''
         for sc in self.subContours:
             _=sc.plot(*args,**kwds)
+    
     def cellPlot(self,*args,**kwds):
         '''Plot the full contours in a way that can be overlaid on an imshow
            State: Access only'''
@@ -570,12 +431,14 @@ class CellNetwork:
             x = [ p[0]-0.5 for p in contourPoints[v] ]
             y = [ p[1]-0.5 for p in contourPoints[v] ]
             _=plt.plot( y,x, *args, **kwds )
+    
     def scPlotT(self,*args,**kwds):
         '''Plot the subContours in a way that can be overlaid on a transposed imshow
            (matches closely with diagramPlot in VFMLite)
            State: Access only'''
         for sc in self.subContours:
             _=sc.plotT(*args,**kwds)
+    
     def cellPlotT(self,*args,**kwds):
         '''Plot the full contours in a way that can be overlaid on a transposed imshow
            (matches closely with diagramPlot in VFMLite)
@@ -757,6 +620,152 @@ def GetXYListAndPolyListWithLimitedPointsBetweenNodes(cellNetworkList,splitLengt
     return GetXYListAndPolyListFromCellNetworkList(
              GetCellNetworkListWithLimitedPointsBetweenNodes(cellNetworkList,splitLength,fixedNumInteriorPoints,interpolate) )
 
+def FindMatchesAndRemovals(cnA,cnB):
+    '''Take two CellNetworks and get 3 lists of indices for each:
+       matched:        There is a direct analog in the other cellnet
+       remove:         There is no direct analog in the other cellnet, but
+                       collapsing these to 4-junctions will map to the other network
+       notRecoverable: There is no analog in the other cellnet'''
+    if not (cnA.__class__==cnB.__class__==CellNetwork):
+        raise TypeError('cnA and cnB must be CellNetworks!')
+    
+    if cnA==cnB:
+        raise ValueError('cnA and cnB must be different objects!')
+    
+    # Get a sorted list of indices into A and B sorted with this custom key function:
+    def getKeyFun(cn):
+        def retFun(x):
+            sc = cn.subContours[x]
+            return sc.values, sc.startPointValues, sc.endPointValues
+        return retFun
+    
+    indexPoolA = sorted( range(len(cnA.subContours)), key = getKeyFun(cnA) )
+    indexPoolB = sorted( range(len(cnB.subContours)), key = getKeyFun(cnB) )
+    
+    # Make dictionaries that take a values pair and return a set of indices into cnX.subcontours
+    pairGroupsA = { k:list(g) for k,g in itertools.groupby( indexPoolA,
+                                                            lambda x: cnA.subContours[x].values ) }
+    pairGroupsB = { k:list(g) for k,g in itertools.groupby( indexPoolB,
+                                                            lambda x: cnB.subContours[x].values ) }
+    
+    matchedA = []
+    matchedB = []
+    removeA = []
+    removeB = []
+    notRecoverableA = []
+    notRecoverableB = []
+    
+    def intersectTest(a,b,nIntersections):
+        scA,scB = cnA.subContours[a],cnB.subContours[b]
+        startEndA = [scA.startPointValues,scA.endPointValues]
+        startEndB = [scB.startPointValues,scB.endPointValues]
+        return len( set(startEndA).intersection(startEndB) ) == nIntersections
+    
+    # First, find all the subContours from A and B that match between the same pair of values or flip-flopped values:
+    for nIntersections,multiFailString in [ ( 2, 'with the same start/end point values:' ),
+                                            ( 1, 'with one common endpoint:'             ),
+                                            ( 0, 'without common start/endpoints:'       ),]:
+        commonPairs = set(pairGroupsA.keys()).intersection(pairGroupsB.keys())
+        for pair in commonPairs:
+            # Look for any and all connections (i,j) between pairGroupsA[pair] and pairGroupsB[pair]
+            # each pair here is a successful match between a subcontour in A and another in B
+            matchInds = [ (i,j) for i,a in enumerate(pairGroupsA[pair])
+                                for j,b in enumerate(pairGroupsB[pair])
+                                if intersectTest(a,b,nIntersections) ]
+            
+            # for A and B, get matchX, the list of indices into cnX.subcontours
+            matchA = [ pairGroupsA[pair][i] for i,j in matchInds ]
+            matchB = [ pairGroupsB[pair][j] for i,j in matchInds ]
+            
+            # Once we've matched, take these out of the pool for checking
+            for i,j in matchInds:
+                del(pairGroupsA[pair][i])
+                del(pairGroupsB[pair][j])
+            
+            # And then collect the matches into either matchedX, removeX, or notRecoverableX
+            if len(matchInds)==1:
+                matchedA += matchA
+                matchedB += matchB
+            elif len(matchInds)>1:
+                print 'Not recoverable'
+                print "sc's matches multiple sc's in opposing list " + multiFailString,pair,matchA,matchB
+                notRecoverableA += matchA
+                notRecoverableB += matchB
+    
+    def flipFlopFun(a,b,opStr):
+        if opStr=='and':
+            op = operator.and_
+        elif opStr=='or':
+            op = operator.or_
+        scA,scB = cnA.subContours[a],cnB.subContours[b]
+        return op( scA.values==scB.cornerConnections(),
+                   scB.values==scA.cornerConnections() )
+    
+    # Next, check for flip-flopped values:
+    for opStr,multiFailString in [ ( 'and', 'with flip-flopped values'      ),
+                                   ( 'or',  'with flip-flopped values (OR)' ), ]:
+        for pairA in pairGroupsA.keys():
+            for pairB in pairGroupsB.keys():
+                # Look for any and all connections (i,j) between pairGroupsA[pair] and pairGroupsB[pair]
+                # each pair here is a successful match between a subcontour in A and another in B
+                matchInds = [ (i,j) for i,a in enumerate(pairGroupsA[pairA])
+                                    for j,b in enumerate(pairGroupsB[pairB])
+                                    if flipFlopFun(a,b,opStr) ]
+                
+                # for A and B, get matchX, the list of indices into cnX.subcontours
+                matchA = [ pairGroupsA[pairA][i] for i,j in matchInds ]
+                matchB = [ pairGroupsB[pairB][j] for i,j in matchInds ]
+                
+                # Once we've matched, take these out of the pool for checking
+                for i,j in matchInds:
+                    del(pairGroupsA[pairA][i])
+                    del(pairGroupsB[pairB][j])
+                
+                # And then collect the matches into either matchedX, removeX, or notRecoverableX
+                if len(matchInds)==1:
+                    removeA += matchA
+                    removeB += matchB
+                elif len(matchInds)>1:
+                    print 'Not recoverable'
+                    print "sc's matches multiple sc's in opposing list " + multiFailString,pair,matchA,matchB
+                    notRecoverableA += matchA
+                    notRecoverableB += matchB
+    
+    # Lastly, look for a subContours in A that collapsed to a 4-junction in B (and vice versa)
+    # (This construct lets us loop instead of duplicating the code below)
+    loopVars = [ ( pairGroupsA,cnA,cnB,matchedA,removeA,notRecoverableA,'A','B' ),
+                 ( pairGroupsB,cnB,cnA,matchedB,removeB,notRecoverableB,'B','A' ), ]
+    for pairGroupsX,cnX,cnO,matchedX,removeX,notRecoverableX,name,otherName in loopVars:
+        for pair in pairGroupsX.keys():
+            matchInds = [ i for i,x in enumerate(pairGroupsX[pair])
+                            for q in cnO.quadPoints
+                            if q.values == tuple(sorted(set(cnX.subContours[x].startPointValues +
+                                                            cnX.subContours[x].endPointValues))) ]
+            match = [ pairGroupsX[pair][i] for i in matchInds ]
+            
+            for i in matchInds:
+                del(pairGroupsX[pair][i])
+            
+            # And then collect the matches into either matchedX, removeX, or notRecoverableX
+            if len(matchInds)==1:
+                removeX += match
+            elif len(matchInds)>1:
+                print 'Not recoverable'
+                print "sc in "+name+" matches multiple 4-junctions in "+otherName+":",pair,match
+                notRecoverableX += match
+    
+    # Anything that didn't get matched (and then deleted) get flagged as notRecoverable
+    remainingPairsA = flatten(pairGroupsA.values())
+    remainingPairsB = flatten(pairGroupsB.values())
+    if len(remainingPairsA)+len(remainingPairsB)>0:
+        print 'Not Recoverable! No matches found!'
+        print 'A:', [ (i,cnA.subContours[i].values) for i in remainingPairsA ]
+        print 'B:', [ (i,cnB.subContours[i].values) for i in remainingPairsB ]
+        notRecoverableA += remainingPairsA
+        notRecoverableB += remainingPairsB
+    
+    return matchedA,matchedB, removeA,removeB, notRecoverableA,notRecoverableB
+
 def GetMatchedCellNetworksCollapsing(cnA,cnB):
     '''Make 2 simplified cell networks, making sure that there is a 1-to-1 mapping between all subcontours
        This function removes values that are not common to both networks and collapses
@@ -774,16 +783,13 @@ def GetMatchedCellNetworksCollapsing(cnA,cnB):
     cnA.RemoveValues(valsNotInB)
     cnB.RemoveValues(valsNotInA)
     
-    matchedInB,removeFromA_a,removeFromB_a,notRecoverableInA = cnA.FindMatchesAndRemovals(cnB)
-    unMatchedInB = [ i for i in range(len(cnB.subContours)) if i not in matchedInB ] # This lets us skip the indexes that already matched
+    matchedA,matchedB, removeA,removeB, notRecoverableA,notRecoverableB = FindMatchesAndRemovals(cnA,cnB)
     
-    _,removeFromB_b,removeFromA_b,notRecoverableInB = cnB.FindMatchesAndRemovals(cnA,searchInds = unMatchedInB) # FLIP
+    print 'Summary of pairs that are not recoverable from A:',notRecoverableA
+    print 'Summary of pairs that are not recoverable from B:',notRecoverableB
     
-    print 'Summary of pairs that are not recoverable from A:',notRecoverableInA
-    print 'Summary of pairs that are not recoverable from B:',notRecoverableInB
-    
-    cnA.RemoveMultipleSubContours(removeFromA_a + removeFromA_b)
-    cnB.RemoveMultipleSubContours(removeFromB_a + removeFromB_b)
+    cnA.RemoveMultipleSubContours(removeA)
+    cnB.RemoveMultipleSubContours(removeB)
     
     return cnA,cnB
 
