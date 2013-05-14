@@ -803,25 +803,17 @@ def GetMatchedCellNetworksCollapsingWithLimitedPoints(cnA,cnB,splitLength=1,fixe
     
     return cnALim,cnBLim
 
-def GetCVDListStatic( waterArr,d,useStaticAnalysis,
-                      extraRemoveValsByFrame=[],splitLength=20, fixedNumInteriorPoints=None,
-                      usePlot=False,forceRemake=False ):
-    '''Get cvdLists from a waterArr, ignoring any differences between frames. This function:
-        * removes values in extraRemoveValsByFrame,
-        * limits points between nodes
-        * compresses cellID's to begin at 1 (excludes background)
-        * returns a cvdList
-       
-       Throws error if static flag is not set; in this case,
-        use GetMatchedCVDListPrevNext instead'''
+def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False ):
+    '''Get a CellNetwork list from a waterArr, ignoring any differences between frames.
+       This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
     
     allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
     
-    # Ensure we're doing a static analysis
-    assert useStaticAnalysis, 'useStaticAnalysis is not set! Did you mean to use the function GetMatchedCVDListPrevNext?'
     # Ensure we got a list-of-lists for extraRemovalsByFrame
     assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     # Ensure that this has enough elements, if not, add more empty lists
+    if extraRemoveValsByFrame==None:
+        extraRemoveValsByFrame = []
     extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
     
     cnListStaticFile = os.path.join(d,'cellNetworksListStatic.pickle') # Saved cellNetworks file
@@ -839,6 +831,7 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     if not loadCnListFromFile:
         cnList = []
         for i in range(len(waterArr)):
+            print 'Generating CellNetwork for frame: %i' % i
             water = np.array(waterArr[i])
             valsToKeep = sorted( set(allValsByFrame[i]).difference(extraRemoveValsByFrame[i]) )
             for v in sorted(extraRemoveValsByFrame[i]):
@@ -851,6 +844,25 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
         if not any(extraRemoveValsByFrame):
             print 'Saving cnList to file:',cnListStaticFile
             cPickle.dump(cnList,open(cnListStaticFile,'w'))
+    return cnList
+    
+    
+def GetCVDListStatic( waterArr,d,useStaticAnalysis,
+                      extraRemoveValsByFrame=None,splitLength=20, fixedNumInteriorPoints=None,
+                      usePlot=False,forceRemake=False ):
+    '''Get cvdLists from a waterArr, ignoring any differences between frames. This function:
+        * removes values in extraRemoveValsByFrame,
+        * limits points between nodes
+        * compresses cellID's to begin at 1 (excludes background)
+        * returns a cvdList
+       
+       Throws error if static flag is not set; in this case,
+        use GetMatchedCVDListPrevNext instead'''
+    
+    # Ensure we're doing a static analysis
+    assert useStaticAnalysis, 'useStaticAnalysis is not set! Did you mean to use the function GetMatchedCVDListPrevNext?'
+    
+    cnList = GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame,forceRemake )
     
     # Run GetCellNetworkWithLimitedPointsBetweenNodes for each individual CellNetwork;
     #   we don't want GetCellNetworkListWithLimitedPointsBetweenNodes(cnList,splitLength,fixedNumInteriorPoints,interpolate=True)
@@ -867,29 +879,18 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     
     return cvdList
 
-def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
-                               extraRemoveValsByFrame=[],splitLength=20, fixedNumInteriorPoints=None,
-                               usePlot=False,forceRemake=False ):
-    '''Get matched before and after cvdLists from a waterArr. This function:
-        * removes values in extraRemoveValsByFrame,
-        * matches subContours between CellNetworks
-            - since this is the slowest step, these 2 matched networks are saved to a file in d and reloaded if this is run again
-              (with the caveat that save/load will not occur if extraRemoveValsByFrame are specified)
-              load can be overridden with forceRemake
-        * limits points between nodes
-        * compresses cellID's to begin at 1 (excludes background)
-        * returns 2 cvdLists
-       
-       Throws error if static flag is set; in this case,
-        use GetCVDListStatic instead'''
     
+def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False ):
+    '''Get matched before and after CellNetwork lists from a waterArr.
+       This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
+
     allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
     
-    # Ensure we're doing a dynamic analysis (if you just want to get rid of viscous effects, set viscosityTimeStepRatio to 0)
-    assert not useStaticAnalysis, 'useStaticAnalysis is set! Did you mean to use the function GetCVDListStatic?'
     # Ensure we got a list-of-lists for extraRemovalsByFrame
     assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     # Ensure that this has enough elements, if not, add more empty lists
+    if extraRemoveValsByFrame==None:
+        extraRemoveValsByFrame = []
     extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
     
     cnListPrevAndNextFile = os.path.join(d,'cellNetworksListPrevAndNext.pickle') # Saved cellNetworks file
@@ -908,6 +909,7 @@ def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
         cnListPrev = []
         cnListNext = []
         for i in range(len(waterArr)-1):
+            print 'Matching frames %i and %i' % (i,i+1)
             # create matched arrays first:
             waterA,waterB = np.array(waterArr[i]) , np.array(waterArr[i+1])
             extraRemovalsAB = set(extraRemoveValsByFrame[i]).union(extraRemoveValsByFrame[i+1])
@@ -930,6 +932,29 @@ def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
         if not any(extraRemoveValsByFrame):
             print 'Saving cnLists to file:',cnListPrevAndNextFile
             cPickle.dump([cnListPrev,cnListNext],open(cnListPrevAndNextFile,'w'))
+    
+    return cnListPrev,cnListNext
+
+def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
+                               extraRemoveValsByFrame=None,splitLength=20, fixedNumInteriorPoints=None,
+                               usePlot=False,forceRemake=False ):
+    '''Get matched before and after cvdLists from a waterArr. This function:
+        * removes values in extraRemoveValsByFrame,
+        * matches subContours between CellNetworks
+            - since this is the slowest step, these 2 matched networks are saved to a file in d and reloaded if this is run again
+              (with the caveat that save/load will not occur if extraRemoveValsByFrame are specified)
+              load can be overridden with forceRemake
+        * limits points between nodes
+        * compresses cellID's to begin at 1 (excludes background)
+        * returns 2 cvdLists
+       
+       Throws error if static flag is set; in this case,
+        use GetCVDListStatic instead'''
+    
+    # Ensure we're doing a dynamic analysis (if you just want to get rid of viscous effects, set viscosityTimeStepRatio to 0)
+    assert not useStaticAnalysis, 'useStaticAnalysis is set! Did you mean to use the function GetCVDListStatic?'
+    
+    cnListPrev,cnListNext = GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame,forceRemake)
     
     cnListPrevLim,cnListNextLim = GetMatchedCellNetworkListsWithLimitedPointsBetweenNodes(cnListPrev,cnListNext,splitLength,fixedNumInteriorPoints,interpolate=True)
     
