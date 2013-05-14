@@ -31,7 +31,7 @@ def GetValuesAroundSCPoint(watershed2d,point):
         print "THIS POINT IS NOT INTERIOR TO THE ARRAY; THERE ARE NOT 4 POINTS AROUND IT!"
         return (None,None,None)
 
-class SubContour:
+class SubContour(object):
     '''A class to hold the data for a single SubContour (basically a connected list of points)
        This was designed to replace the old and crufty cVLS (contour's values,length, and subcontour)
        These three fields map to values, adjusted_length, and points respectively (much clearer!)
@@ -68,7 +68,7 @@ class SubContour:
         y = [ p[1]-0.5 for p in self.points ]
         return plt.plot( x,y, *args, **kwds )
 
-class QuadPoint:
+class QuadPoint(object):
     values = None
     point = None
     def __init__(self,values,point):
@@ -82,7 +82,7 @@ class QuadPoint:
 class DegenerateNetworkException(Exception):
     pass
 
-class CellNetwork:
+class CellNetwork(object):
     '''Holds the critical information for a single frame in order to reconstruct any subcontour of full contour
        State: This object manages it's state and the state of all it's members like SubContour
               External functions, however should NOT mutate its state if it is passed as an argument;
