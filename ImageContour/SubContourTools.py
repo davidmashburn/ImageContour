@@ -673,14 +673,18 @@ def FindMatchesAndRemovals(cnA,cnB):
                                 for j,b in enumerate(pairGroupsB[pair])
                                 if intersectTest(a,b,nIntersections) ]
             
+            aInds,bInds = ziptranspose(matchInds) if len(matchInds)>0 else ([],[])
+            aInds,bInds = sorted(set(aInds)),sorted(set(bInds))
+            
             # for A and B, get matchX, the list of indices into cnX.subcontours
-            matchA = [ pairGroupsA[pair][i] for i,j in matchInds ]
-            matchB = [ pairGroupsB[pair][j] for i,j in matchInds ]
+            matchA = [ pairGroupsA[pair][i] for i in aInds ]
+            matchB = [ pairGroupsB[pair][i] for i in bInds ]
             
             # Once we've matched, take these out of the pool for checking
-            for i,j in matchInds:
+            for i in aInds[::-1]:
                 del(pairGroupsA[pair][i])
-                del(pairGroupsB[pair][j])
+            for i in bInds[::-1]:
+                del(pairGroupsB[pair][i])
             
             # And then collect the matches into either matchedX, removeX, or notRecoverableX
             if len(matchInds)==1:
@@ -712,14 +716,18 @@ def FindMatchesAndRemovals(cnA,cnB):
                                     for j,b in enumerate(pairGroupsB[pairB])
                                     if flipFlopFun(a,b,opStr) ]
                 
+                aInds,bInds = ziptranspose(matchInds) if len(matchInds)>0 else ([],[])
+                aInds,bInds = sorted(set(aInds)),sorted(set(bInds))
+            
                 # for A and B, get matchX, the list of indices into cnX.subcontours
-                matchA = [ pairGroupsA[pairA][i] for i,j in matchInds ]
-                matchB = [ pairGroupsB[pairB][j] for i,j in matchInds ]
+                matchA = [ pairGroupsA[pairA][i] for i in aInds ]
+                matchB = [ pairGroupsB[pairB][i] for i in bInds ]
                 
                 # Once we've matched, take these out of the pool for checking
-                for i,j in matchInds:
+                for i in aInds[::-1]:
                     del(pairGroupsA[pairA][i])
-                    del(pairGroupsB[pairB][j])
+                for i in bInds[::-1]:
+                    del(pairGroupsB[pairB][i])
                 
                 # And then collect the matches into either matchedX, removeX, or notRecoverableX
                 if len(matchInds)==1:
@@ -743,7 +751,7 @@ def FindMatchesAndRemovals(cnA,cnB):
                                                             cnX.subContours[x].endPointValues))) ]
             match = [ pairGroupsX[pair][i] for i in matchInds ]
             
-            for i in matchInds:
+            for i in sorted(matchInds,reverse=True):
                 del(pairGroupsX[pair][i])
             
             # And then collect the matches into either matchedX, removeX, or notRecoverableX
@@ -809,11 +817,13 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
     
     allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
     
-    # Ensure we got a list-of-lists for extraRemovalsByFrame
-    assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     # Ensure that this has enough elements, if not, add more empty lists
     if extraRemoveValsByFrame==None:
         extraRemoveValsByFrame = []
+    
+    # Ensure we got a list-of-lists for extraRemovalsByFrame
+    assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
+    
     extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
     
     cnListStaticFile = os.path.join(d,'cellNetworksListStatic.pickle') # Saved cellNetworks file
@@ -886,11 +896,13 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
 
     allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
     
-    # Ensure we got a list-of-lists for extraRemovalsByFrame
-    assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     # Ensure that this has enough elements, if not, add more empty lists
     if extraRemoveValsByFrame==None:
         extraRemoveValsByFrame = []
+    
+    # Ensure we got a list-of-lists for extraRemovalsByFrame
+    assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
+    
     extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
     
     cnListPrevAndNextFile = os.path.join(d,'cellNetworksListPrevAndNext.pickle') # Saved cellNetworks file
