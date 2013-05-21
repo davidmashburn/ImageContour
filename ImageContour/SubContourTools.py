@@ -921,6 +921,7 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
         cnListPrev = []
         cnListNext = []
         allMatched = True
+        badFramePairs = []
         for i in range(len(waterArr)-1):
             print 'Matching frames %i and %i' % (i,i+1)
             # create matched arrays first:
@@ -943,9 +944,11 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
             cnListNext.append(cnB)
             if len(notRecoverableA)+len(notRecoverableB) > 0:
                 allMatched=False
+                badFramePairs.append( (i,i+1) )
         if not allMatched:
-            print 'Matching Errors! Will not save matched cnLists to file!'
-        elif not any(extraRemoveValsByFrame):
+            print 'Matching Errors! Will save cnLists to file, but these frames did not match:'
+            print badFramePairs
+        if not any(extraRemoveValsByFrame):
             # Only save this if we're using all the values; otherwise it gets confusing!
             print 'Saving cnLists to file:',cnListPrevAndNextFile
             cPickle.dump([cnListPrev,cnListNext],open(cnListPrevAndNextFile,'w'))
