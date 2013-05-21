@@ -799,13 +799,13 @@ def GetMatchedCellNetworksCollapsing(cnA,cnB):
     cnA.RemoveMultipleSubContours(removeA)
     cnB.RemoveMultipleSubContours(removeB)
     
-    return cnA,cnB
+    return cnA,cnB,notRecoverableA,notRecoverableB
 
 def GetMatchedCellNetworksCollapsingWithLimitedPoints(cnA,cnB,splitLength=1,fixedNumInteriorPoints=None,interpolate=True):
     '''Make 2 simplified cell networks, making sure that there is a 1-to-1 mapping between all points; this function collapses
        pairs of subcontours that do not match but are in between the same 4 cells'''
     
-    cnANew,cnBNew = GetMatchedCellNetworksCollapsing(cnA,cnB)
+    cnANew,cnBNew,notRecoverableA,notRecoverableB = GetMatchedCellNetworksCollapsing(cnA,cnB)
     cnALim,cnBLim = GetCellNetworkListWithLimitedPointsBetweenNodes( [cnANew,cnBNew],splitLength,
                                                                      fixedNumInteriorPoints,interpolate)
     
@@ -920,6 +920,7 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
     if not loadCnListFromFile:
         cnListPrev = []
         cnListNext = []
+        allMatched = True
         for i in range(len(waterArr)-1):
             print 'Matching frames %i and %i' % (i,i+1)
             # create matched arrays first:
@@ -937,15 +938,19 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
             cnA = GetCellNetwork(waterA,commonVals)
             cnB = GetCellNetwork(waterB,commonVals)
             
-            cnA,cnB = GetMatchedCellNetworksCollapsing(cnA,cnB)
+            cnA,cnB,notRecoverableA,notRecoverableB = GetMatchedCellNetworksCollapsing(cnA,cnB)
             cnListPrev.append(cnA)
             cnListNext.append(cnB)
-        # Only save this if we're using all the values; otherwise it gets confusing!
-        if not any(extraRemoveValsByFrame):
+            if len(notRecoverableA)+len(notRecoverableB) > 0:
+                allMatched=False
+        if not allMatched:
+            print 'Matching Errors! Will not save matched cnLists to file!'
+        elif not any(extraRemoveValsByFrame):
+            # Only save this if we're using all the values; otherwise it gets confusing!
             print 'Saving cnLists to file:',cnListPrevAndNextFile
             cPickle.dump([cnListPrev,cnListNext],open(cnListPrevAndNextFile,'w'))
     
-    return cnListPrev,cnListNext
+    return cnListPrev,cnListNext,allMatched
 
 def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
                                extraRemoveValsByFrame=None,splitLength=20, fixedNumInteriorPoints=None,
@@ -966,7 +971,7 @@ def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
     # Ensure we're doing a dynamic analysis (if you just want to get rid of viscous effects, set viscosityTimeStepRatio to 0)
     assert not useStaticAnalysis, 'useStaticAnalysis is set! Did you mean to use the function GetCVDListStatic?'
     
-    cnListPrev,cnListNext = GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame,forceRemake)
+    cnListPrev,cnListNext,allMatched = GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame,forceRemake)
     
     cnListPrevLim,cnListNextLim = GetMatchedCellNetworkListsWithLimitedPointsBetweenNodes(cnListPrev,cnListNext,splitLength,fixedNumInteriorPoints,interpolate=True)
     
