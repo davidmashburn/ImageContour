@@ -793,8 +793,11 @@ def GetMatchedCellNetworksCollapsing(cnA,cnB):
     
     matchedA,matchedB, removeA,removeB, notRecoverableA,notRecoverableB = FindMatchesAndRemovals(cnA,cnB)
     
-    print 'Summary of pairs that are not recoverable from A:',notRecoverableA
-    print 'Summary of pairs that are not recoverable from B:',notRecoverableB
+    if len(notRecoverableA)+len(notRecoverableB) > 0:
+        print 'Summary of pairs that are not recoverable from A:',notRecoverableA
+        print 'Summary of pairs that are not recoverable from B:',notRecoverableB
+    else:
+        print 'All pairs matched.'
     
     cnA.RemoveMultipleSubContours(removeA)
     cnB.RemoveMultipleSubContours(removeB)
@@ -917,11 +920,14 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
             print 'cnLists are the wrong length in the file:',cnListPrevAndNextFile
             print 'Will remake them'
             loadCnListFromFile=False
+    
+    allMatched = True
+    
     if not loadCnListFromFile:
         cnListPrev = []
         cnListNext = []
-        allMatched = True
         badFramePairs = []
+        
         for i in range(len(waterArr)-1):
             print 'Matching frames %i and %i' % (i,i+1)
             # create matched arrays first:
