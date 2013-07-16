@@ -4,7 +4,8 @@ This is admittedly less coherent/documented and more "bleeding edge" than ImageC
 
 import os
 from copy import deepcopy
-import cPickle
+#import cPickle # old pickle version
+import json
 import itertools
 import operator
 
@@ -448,7 +449,35 @@ class CellNetwork(object):
             x = [ p[0]-0.5 for p in contourPoints[v] ]
             y = [ p[1]-0.5 for p in contourPoints[v] ]
             _=plt.plot( x,y, *args, **kwds )
-        
+
+
+def GetFlatDataFromCellNetwork(cn):
+    '''Convert a CellNetwork with all its nested objects into flat datastructure
+       (list,dict,tuple,etc).
+       Details:
+           Any non-builtin object that is made of only builtin elements
+           (aka, no classes) can just be converted easily to a dictionary.
+           So, to make a complex object into a dictionary , we just need to
+           recursively turn all "contained" objects into dictionaries.'''
+    # First, ensure that adjusted_length and values are a normal types and not numpy...
+    for sc in cn.subContours:
+        sc.adjusted_length = float(sc.adjusted_length)
+        sc.values = [ int(v) for v in sc.values]
+    
+    return { 'subContours' : [ sc.__dict__ for sc in cn.subContours ],
+             'quadPoints' : [ qp.__dict__ for qp in cn.quadPoints ],
+             'contourOrderingByValue' : cn.contourOrderingByValue,
+             'allValues' : cn.allValues, }
+
+def GetCellNetworkFromFlatData(fdcn):
+    '''Construct a CellNetwork from a flat data structure(fdcn) (aka dictionaries instead of objects)'''
+    for qp in fdcn['quadPoints']:
+        qp['values'] = tuple(qp['values']) # Force all QP's to be tuple
+    
+    return CellNetwork( **{ 'subContours' : [ SubContour(**j) for j in fdcn['subContours'] ],
+                            'quadPoints' : [ QuadPoint(**j) for j in fdcn['quadPoints'] ],
+                            'contourOrderingByValue' : { int(k):v for k,v in fdcn['contourOrderingByValue'].iteritems() },
+                            'allValues': fdcn['allValues'], } )
 
 def SubContourListfromCVLSList(cVLS_List,startPointValues_List=[],endPointValues_List=[]):
     '''Get a list of SubContour objects from an old list of cVLS's'''
@@ -829,13 +858,18 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
     
     extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
     
-    cnListStaticFile = os.path.join(d,'cellNetworksListStatic.pickle') # Saved cellNetworks file
+    cnListStaticFile = os.path.join(d,'cellNetworksListStatic.json') # Saved cellNetworks file
+    #cnListStaticFile = os.path.join(d,'cellNetworksListStatic.pickle') # Saved cellNetworks file # old pickle version
     
     loadCnListFromFile = os.path.exists(cnListStaticFile) and not any(extraRemoveValsByFrame) and not forceRemake
     
     if loadCnListFromFile:
         print 'Reloading cnLists from file:',cnListStaticFile
-        cnList = cPickle.load(open(cnListStaticFile,'r'))
+        
+        # Load cnList from JSON file
+        with open(cnListStaticFile,'r') as fid:
+            cnList = [ GetCellNetworkFromFlatData(i) for i in json.load(fid) ]
+        #cnList = cPickle.load(open(cnListStaticFile,'r')) # old pickle version
         
         if len(cnList)!=len(waterArr):
             print 'cnList is the wrong length in the file:',cnListStaticFile
@@ -856,7 +890,10 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
         # Only save this if we're using all the values; otherwise it gets confusing!
         if not any(extraRemoveValsByFrame):
             print 'Saving cnList to file:',cnListStaticFile
-            cPickle.dump(cnList,open(cnListStaticFile,'w'))
+            # Save cnList to JSON file
+            with open(cnListStaticFile,'w') as fid:
+                json.dump( [ GetFlatDataFromCellNetwork(cn) for cn in cnList ], fid )
+            #cPickle.dump(cnList,open(cnListStaticFile,'w')) # old pickle version
     return cnList
     
     
@@ -892,7 +929,6 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     
     return cvdList
 
-    
 def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False ):
     '''Get matched before and after CellNetwork lists from a waterArr.
        This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
@@ -908,13 +944,20 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
     
     extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
     
-    cnListPrevAndNextFile = os.path.join(d,'cellNetworksListPrevAndNext.pickle') # Saved cellNetworks file
+    cnListPrevAndNextFile = os.path.join(d,'cellNetworksListPrevAndNext.json') # Saved cellNetworks file
+    #cnListPrevAndNextFile = os.path.join(d,'cellNetworksListPrevAndNext.pickle') # Saved cellNetworks file # old pickle version
     
     loadCnListFromFile = os.path.exists(cnListPrevAndNextFile) and not any(extraRemoveValsByFrame) and not forceRemake
     
     if loadCnListFromFile:
         print 'Reloading cnLists from file:',cnListPrevAndNextFile
-        cnListPrev,cnListNext = cPickle.load(open(cnListPrevAndNextFile,'r'))
+        
+        # Load cnListPrev and cnListNext from JSON file
+        with open(cnListPrevAndNextFile,'r') as fid:
+            jsdat = json.load(fid)
+            cnListPrev = [ GetCellNetworkFromFlatData(i) for j in jsdat[0] ]
+            cnListNext = [ GetCellNetworkFromFlatData(i) for j in jsdat[1] ]
+        #cnListPrev,cnListNext = cPickle.load(open(cnListPrevAndNextFile,'r')) # old pickle version
         
         if len(cnListPrev)!=len(waterArr)-1:
             print 'cnLists are the wrong length in the file:',cnListPrevAndNextFile
@@ -957,7 +1000,13 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
         if not any(extraRemoveValsByFrame):
             # Only save this if we're using all the values; otherwise it gets confusing!
             print 'Saving cnLists to file:',cnListPrevAndNextFile
-            cPickle.dump([cnListPrev,cnListNext],open(cnListPrevAndNextFile,'w'))
+            
+            # Save cnListPrev and cnListNext to JSON file
+            with open(cnListPrevAndNextFile,'w') as fid:
+                json.dump( [ [ GetFlatDataFromCellNetwork(cn)
+                              for cn in cnl ]
+                            for cnl in (cnListPrev,cnListNext) ], fid )
+            #cPickle.dump([cnListPrev,cnListNext],open(cnListPrevAndNextFile,'w')) # old pickle version
     
     return cnListPrev,cnListNext,allMatched
 
