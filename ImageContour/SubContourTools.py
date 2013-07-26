@@ -722,6 +722,16 @@ def FindMatchesAndRemovals(cnA,cnB):
             elif len(matchInds)>1:
                 print 'Not recoverable'
                 print "sc's matches multiple sc's in opposing list " + multiFailString,pair,matchA,matchB
+                # Print more details...
+                print 'matchInds:',matchInds
+                for cn,matc,ABstr in [ (cnA,matchA,'A'),
+                                       (cnB,matchB,'B'), ]:
+                    scs = [ [sc.points[0],sc.points[-1],sc.startPointValues,sc.endPointValues]
+                           for i in matc
+                           for sc in (cn.subContours[i],) ] # loop over 1-element list; basically local variable assignment
+                    print 'Start/end coords/values for '+ABstr+':', scs
+                
+                scA,scB = cnA.subContours[a],cnB.subContours[b]
                 notRecoverableA += matchA
                 notRecoverableB += matchB
     
@@ -955,8 +965,8 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
         # Load cnListPrev and cnListNext from JSON file
         with open(cnListPrevAndNextFile,'r') as fid:
             jsdat = json.load(fid)
-            cnListPrev = [ GetCellNetworkFromFlatData(i) for j in jsdat[0] ]
-            cnListNext = [ GetCellNetworkFromFlatData(i) for j in jsdat[1] ]
+            cnListPrev = [ GetCellNetworkFromFlatData(i) for i in jsdat[0] ]
+            cnListNext = [ GetCellNetworkFromFlatData(i) for i in jsdat[1] ]
         #cnListPrev,cnListNext = cPickle.load(open(cnListPrevAndNextFile,'r')) # old pickle version
         
         if len(cnListPrev)!=len(waterArr)-1:
