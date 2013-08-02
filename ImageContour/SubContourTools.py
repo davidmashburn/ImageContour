@@ -910,7 +910,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
     
 def GetCVDListStatic( waterArr,d,useStaticAnalysis,
                       extraRemoveValsByFrame=None,splitLength=20, fixedNumInteriorPoints=None,
-                      usePlot=False,forceRemake=False ):
+                      usePlot=False,forceRemake=False,bgVals=(0,1) ):
     '''Get cvdLists from a waterArr, ignoring any differences between frames. This function:
         * removes values in extraRemoveValsByFrame,
         * limits points between nodes
@@ -923,7 +923,7 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     # Ensure we're doing a static analysis
     assert useStaticAnalysis, 'useStaticAnalysis is not set! Did you mean to use the function GetMatchedCVDListPrevNext?'
     
-    cnList = GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame,forceRemake )
+    cnList = GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame,forceRemake,bgVals  )
     
     # Run GetCellNetworkWithLimitedPointsBetweenNodes for each individual CellNetwork;
     #   we don't want GetCellNetworkListWithLimitedPointsBetweenNodes(cnList,splitLength,fixedNumInteriorPoints,interpolate=True)
@@ -1024,7 +1024,7 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
 
 def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
                                extraRemoveValsByFrame=None,splitLength=20, fixedNumInteriorPoints=None,
-                               usePlot=False,forceRemake=False ):
+                               usePlot=False,forceRemake=False,bgVals=(0,1) ):
     '''Get matched before and after cvdLists from a waterArr. This function:
         * removes values in extraRemoveValsByFrame,
         * matches subContours between CellNetworks
@@ -1041,7 +1041,7 @@ def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
     # Ensure we're doing a dynamic analysis (if you just want to get rid of viscous effects, set viscosityTimeStepRatio to 0)
     assert not useStaticAnalysis, 'useStaticAnalysis is set! Did you mean to use the function GetCVDListStatic?'
     
-    cnListPrev,cnListNext,allMatched = GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame,forceRemake)
+    cnListPrev,cnListNext,allMatched = GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame,forceRemake,bgVals)
     
     cnListPrevLim,cnListNextLim = GetMatchedCellNetworkListsWithLimitedPointsBetweenNodes(cnListPrev,cnListNext,splitLength,fixedNumInteriorPoints,interpolate=True)
     
