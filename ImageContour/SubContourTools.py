@@ -853,11 +853,12 @@ def GetMatchedCellNetworksCollapsingWithLimitedPoints(cnA,cnB,splitLength=1,fixe
     
     return cnALim,cnBLim
 
-def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False ):
+def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,bgVals=(0,1) ):
     '''Get a CellNetwork list from a waterArr, ignoring any differences between frames.
        This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
     
-    allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
+    allValsByFrame = [ sorted( set(np.unique(i)).difference(bgVals) )
+                      for i in waterArr ] # Skip background
     
     # Ensure that this has enough elements, if not, add more empty lists
     if extraRemoveValsByFrame==None:
@@ -939,11 +940,12 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     
     return cvdList
 
-def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False ):
+def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,bgVals=(0,1) ):
     '''Get matched before and after CellNetwork lists from a waterArr.
        This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
 
-    allValsByFrame = [ np.unique(i)[1:] for i in waterArr ] # Skip background
+    allValsByFrame = [ sorted( set(np.unique(i)).difference(bgVals) )
+                      for i in waterArr ] # Skip background
     
     # Ensure that this has enough elements, if not, add more empty lists
     if extraRemoveValsByFrame==None:
