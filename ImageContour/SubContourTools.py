@@ -493,12 +493,12 @@ def SubContourListfromCVLSList(cVLS_List,startPointValues_List=[],endPointValues
                         endPointValues = tuple(endPointValues_List[i]))
             for i,cvls in enumerate(cVLS_List)]
 
-def GetCellNetwork(watershed2d,allValues=None):
+def GetCellNetwork(watershed2d,allValues=None,bgVals=(0,1)):
     '''Basically a constructor for CellNetwork based on a watershed array'''
     if allValues==None:
         allValues = np.unique(watershed2d)
     allValues = np.array(allValues).tolist() # force numpy arrays to lists
-    allValues = [ v for v in allValues if v!=1 ] # skip the background
+    allValues = [ v for v in allValues if v not in bgVals ] # skip the background
     
     identifier=0 # unique id for each subContour
     scList = []
@@ -542,9 +542,9 @@ def GetCellNetwork(watershed2d,allValues=None):
     
     return CellNetwork( subContours=scList , contourOrderingByValue=contourOrderingByValue , allValues=allValues )
 
-def GetCellNetworksByFrame(watershed,allValsByFrame):
+def GetCellNetworksByFrame(watershed,allValsByFrame,bgVals=(0,1)):
     '''Get a list of CellNetworks based on a watershed segmentation'''
-    return [ GetCellNetwork(watershed[i],allValsByFrame[i])
+    return [ GetCellNetwork(watershed[i],allValsByFrame[i],bgVals)
             for i in range(len(watershed)) ]
 
 def GetXYListAndPolyListFromCellNetworkList(cellNetworkList,closeLoops=True):
@@ -860,7 +860,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
     allValsByFrame = [ sorted( set(np.unique(i)).difference(bgVals) )
                       for i in waterArr ] # Skip background
     
-    # Ensure that this has enough elements, if not, add more empty lists
+    ### Ensure that this has enough elements, if not, add more empty lists
     if extraRemoveValsByFrame==None:
         extraRemoveValsByFrame = []
     
@@ -868,6 +868,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
     assert all([ hasattr(vals,'__iter__') for vals in extraRemoveValsByFrame ])
     
     extraRemoveValsByFrame += [[] for i in range(len(waterArr)-len(extraRemoveValsByFrame))]
+    
     
     cnListStaticFile = os.path.join(d,'cellNetworksListStatic.json') # Saved cellNetworks file
     #cnListStaticFile = os.path.join(d,'cellNetworksListStatic.pickle') # Saved cellNetworks file # old pickle version
@@ -887,16 +888,17 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
             print 'Will remake them'
             loadCnListFromFile=False
     if not loadCnListFromFile:
+        ### The actual code that makes the cnList from scratch
         cnList = []
         for i in range(len(waterArr)):
             print 'Generating CellNetwork for frame: %i' % i
             water = np.array(waterArr[i])
             valsToKeep = sorted( set(allValsByFrame[i]).difference(extraRemoveValsByFrame[i]) )
             for v in sorted(extraRemoveValsByFrame[i]):
-                water[np.where(water==v)] = 1
+                water[np.where(water==v)] = bgVals[0]
             
             # next, create the CellNetwork and append it to the list:
-            cnList.append( GetCellNetwork(water,valsToKeep) )
+            cnList.append( GetCellNetwork(water,valsToKeep,bgVals) )
         
         # Only save this if we're using all the values; otherwise it gets confusing!
         if not any(extraRemoveValsByFrame):
@@ -905,6 +907,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
             with open(cnListStaticFile,'w') as fid:
                 json.dump( [ GetFlatDataFromCellNetwork(cn) for cn in cnList ], fid )
             #cPickle.dump(cnList,open(cnListStaticFile,'w')) # old pickle version
+    
     return cnList
     
     
@@ -997,8 +1000,8 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
                 waterB[np.where(waterB==v)] = 1
             
             # next, create matched CellNetworks:
-            cnA = GetCellNetwork(waterA,commonVals)
-            cnB = GetCellNetwork(waterB,commonVals)
+            cnA = GetCellNetwork(waterA,commonVals,bgVals)
+            cnB = GetCellNetwork(waterB,commonVals,bgVals)
             
             cnA,cnB,notRecoverableA,notRecoverableB = GetMatchedCellNetworksCollapsing(cnA,cnB)
             cnListPrev.append(cnA)
