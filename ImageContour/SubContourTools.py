@@ -47,6 +47,13 @@ class SubContour(object):
     endPointValues = (None,None,None)   # 3 or possibly 4 values around the end point ("triple junction")
     identifier = None # only used sometimes for sorting purposes
     def __init__(self,**kwds):
+        '''Create a SubContour
+           All arguments are converted to attributes; all are optional,
+           but some functions only work when these are set properly:
+             * points: list of (x,y)'s
+             * values: always 2 cellID values
+             * startPointValues: 3 or possibly 4 values around the start point ("triple junction")
+             * endPointValues:   3 or possibly 4 values around the end point ("triple junction")'''
         for k in kwds:
             self.__dict__[k] = kwds[k]
         if 'numPoints' not in kwds.keys():
@@ -96,6 +103,13 @@ class CellNetwork(object):
                                 # no more negative values... (used to mean reverse the contour when inserting)
     allValues = []
     def __init__(self,**kwds):
+        '''Create a CellNetwork
+           All arguments are converted to attributes; all are optionally,
+           but these are needed for functions to work:
+             * subContours: list of SubContour objects
+             * contourOrderingByValue: dictionary with keys that are cellIDs and tuple values like:
+                                       ( <index into subContours>,
+                                         <boolean that determines if this is forward (True) or backwards (False)> )'''
         for k in kwds:
             self.__dict__[k] = kwds[k]
         if 'quadPoints' not in kwds.keys():
@@ -493,7 +507,7 @@ def SubContourListfromCVLSList(cVLS_List,startPointValues_List=[],endPointValues
                         endPointValues = tuple(endPointValues_List[i]))
             for i,cvls in enumerate(cVLS_List)]
 
-def GetCellNetwork(watershed2d,allValues=None,bgVals=(0,1)):
+def GetCellNetwork( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(0,0), ):
     '''Basically a constructor for CellNetwork based on a watershed array'''
     if allValues==None:
         allValues = np.unique(watershed2d)
@@ -508,8 +522,11 @@ def GetCellNetwork(watershed2d,allValues=None,bgVals=(0,1)):
         # No longer needed: #contour,turns,vals = ImageContour.GetContour(watershed[0],v,boundingRect=boundingRect,byNeighbor=True)
         perimeterVals,perimeterList,scPointsList = ImageContour.GetPerimeterByNeighborVal(watershed2d,v,boundingRect=boundingRect,getSubContours=True)
         numSCs=len(perimeterVals)
-        scPointsListAdj = [ (np.array(scp)+[boundingRect[0][0],boundingRect[1][0]]).tolist()
-                       for scp in scPointsList ] # Will need to - 0.5 to line up on an overlay
+        scPointsListAdj = []
+        for scp in scPointsList:
+            scpAdj = np.array(scp)+[boundingRect[0][0],boundingRect[1][0]] # Will need to - 0.5 to line up on an overlay
+            scpAdj = scpAdj*scale + offset
+            scPointsListAdj.append(scpAdj.tolist())
         if len(perimeterList)>0:
             contourOrderingByValue[v] = []
             for i in range(numSCs):
@@ -563,7 +580,7 @@ def GetCellNetworkListWithLimitedPointsBetweenNodes(cellNetworkList,splitLength=
     allPairs = sorted(set( [ tuple(sc.values) for cn in cellNetworkList for sc in cn.subContours ] )) # Value pairs...
     
     # Build the numInteriorPointsDict:
-    if fixedNumInteriorPoints:
+    if fixedNumInteriorPoints!=None:
         numInteriorPointsDict = { p:fixedNumInteriorPoints for p in allPairs }
     else:
         # minLength is the number of points of the shortest subcountour between cells p[0] and p[1] from all frames
@@ -853,7 +870,8 @@ def GetMatchedCellNetworksCollapsingWithLimitedPoints(cnA,cnB,splitLength=1,fixe
     
     return cnALim,cnBLim
 
-def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,bgVals=(0,1) ):
+def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,
+                              bgVals=(0,1),scale=1,offset=(0,0), ):
     '''Get a CellNetwork list from a waterArr, ignoring any differences between frames.
        This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
     
@@ -898,7 +916,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
                 water[np.where(water==v)] = bgVals[0]
             
             # next, create the CellNetwork and append it to the list:
-            cnList.append( GetCellNetwork(water,valsToKeep,bgVals) )
+            cnList.append( GetCellNetwork(water,valsToKeep,bgVals,scale,offset))
         
         # Only save this if we're using all the values; otherwise it gets confusing!
         if not any(extraRemoveValsByFrame):
@@ -913,7 +931,9 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
     
 def GetCVDListStatic( waterArr,d,useStaticAnalysis,
                       extraRemoveValsByFrame=None,splitLength=20, fixedNumInteriorPoints=None,
-                      usePlot=False,forceRemake=False,bgVals=(0,1) ):
+                      usePlot=False,forceRemake=False,bgVals=(0,1),
+                      scale=1,offset=(0,0),
+                    ):
     '''Get cvdLists from a waterArr, ignoring any differences between frames. This function:
         * removes values in extraRemoveValsByFrame,
         * limits points between nodes
@@ -926,7 +946,7 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     # Ensure we're doing a static analysis
     assert useStaticAnalysis, 'useStaticAnalysis is not set! Did you mean to use the function GetMatchedCVDListPrevNext?'
     
-    cnList = GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame,forceRemake,bgVals  )
+    cnList = GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame,forceRemake,bgVals,scale,offset )
     
     # Run GetCellNetworkWithLimitedPointsBetweenNodes for each individual CellNetwork;
     #   we don't want GetCellNetworkListWithLimitedPointsBetweenNodes(cnList,splitLength,fixedNumInteriorPoints,interpolate=True)
@@ -943,7 +963,8 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     
     return cvdList
 
-def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,bgVals=(0,1) ):
+def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,
+                              bgVals=(0,1),scale=1,offset=(0,0), ):
     '''Get matched before and after CellNetwork lists from a waterArr.
        This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
 
@@ -1000,8 +1021,8 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
                 waterB[np.where(waterB==v)] = 1
             
             # next, create matched CellNetworks:
-            cnA = GetCellNetwork(waterA,commonVals,bgVals)
-            cnB = GetCellNetwork(waterB,commonVals,bgVals)
+            cnA = GetCellNetwork(waterA,commonVals,bgVals,scale,offset)
+            cnB = GetCellNetwork(waterB,commonVals,bgVals,scale,offset)
             
             cnA,cnB,notRecoverableA,notRecoverableB = GetMatchedCellNetworksCollapsing(cnA,cnB)
             cnListPrev.append(cnA)
@@ -1027,7 +1048,9 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
 
 def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
                                extraRemoveValsByFrame=None,splitLength=20, fixedNumInteriorPoints=None,
-                               usePlot=False,forceRemake=False,bgVals=(0,1) ):
+                               usePlot=False,forceRemake=False,bgVals=(0,1),
+                               scale=1,offset=(0,0),
+                             ):
     '''Get matched before and after cvdLists from a waterArr. This function:
         * removes values in extraRemoveValsByFrame,
         * matches subContours between CellNetworks
@@ -1044,7 +1067,7 @@ def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
     # Ensure we're doing a dynamic analysis (if you just want to get rid of viscous effects, set viscosityTimeStepRatio to 0)
     assert not useStaticAnalysis, 'useStaticAnalysis is set! Did you mean to use the function GetCVDListStatic?'
     
-    cnListPrev,cnListNext,allMatched = GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame,forceRemake,bgVals)
+    cnListPrev,cnListNext,allMatched = GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame,forceRemake,bgVals,scale,offset)
     
     cnListPrevLim,cnListNextLim = GetMatchedCellNetworkListsWithLimitedPointsBetweenNodes(cnListPrev,cnListNext,splitLength,fixedNumInteriorPoints,interpolate=True)
     
