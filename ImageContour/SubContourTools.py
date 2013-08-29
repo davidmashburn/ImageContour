@@ -870,6 +870,11 @@ def GetMatchedCellNetworksCollapsingWithLimitedPoints(cnA,cnB,splitLength=1,fixe
     
     return cnALim,cnBLim
 
+def _loadCNListStaticFromJsonFile(cnListStaticFile):
+    with open(cnListStaticFile,'r') as fid:
+        cnList = [ GetCellNetworkFromFlatData(i) for i in json.load(fid) ]
+    return cnList
+
 def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,
                               bgVals=(0,1),scale=1,offset=(0,0), ):
     '''Get a CellNetwork list from a waterArr, ignoring any differences between frames.
@@ -897,8 +902,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
         print 'Reloading cnLists from file:',cnListStaticFile
         
         # Load cnList from JSON file
-        with open(cnListStaticFile,'r') as fid:
-            cnList = [ GetCellNetworkFromFlatData(i) for i in json.load(fid) ]
+        cnList = _loadCNListStaticFromJsonFile(cnListStaticFile)
         #cnList = cPickle.load(open(cnListStaticFile,'r')) # old pickle version
         
         if len(cnList)!=len(waterArr):
@@ -963,6 +967,14 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     
     return cvdList
 
+def _loadCNListPrevNextFromJsonFile(cnListPrevAndNextFile):
+    with open(cnListPrevAndNextFile,'r') as fid:
+        jsdat = json.load(fid)
+        cnListPrev = [ GetCellNetworkFromFlatData(i) for i in jsdat[0] ]
+        cnListNext = [ GetCellNetworkFromFlatData(i) for i in jsdat[1] ]
+    return cnListPrev,cnListNext
+
+
 def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,
                               bgVals=(0,1),scale=1,offset=(0,0), ):
     '''Get matched before and after CellNetwork lists from a waterArr.
@@ -989,10 +1001,7 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
         print 'Reloading cnLists from file:',cnListPrevAndNextFile
         
         # Load cnListPrev and cnListNext from JSON file
-        with open(cnListPrevAndNextFile,'r') as fid:
-            jsdat = json.load(fid)
-            cnListPrev = [ GetCellNetworkFromFlatData(i) for i in jsdat[0] ]
-            cnListNext = [ GetCellNetworkFromFlatData(i) for i in jsdat[1] ]
+        cnListPrev,cnListNext = _loadCNListPrevNextFromJsonFile(cnListPrevAndNextFile)
         #cnListPrev,cnListNext = cPickle.load(open(cnListPrevAndNextFile,'r')) # old pickle version
         
         if len(cnListPrev)!=len(waterArr)-1:
