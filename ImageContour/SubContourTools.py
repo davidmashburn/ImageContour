@@ -167,7 +167,9 @@ class CellNetwork(object):
     def UpdateAllValues(self):
         '''Go through the values in all the subContours and collect a list of all of them
            State: Changes state of allValues, but only to to be more consistent'''
-        self.allValues = sorted(set( [ v for sc in self.subContours for v in sc.values if v!=1 ] ))
+        self.allValues = sorted(set( [ v for sc in self.subContours 
+                                         for v in sc.values
+                                         if v!=1 ] ))
     
     def GetAllPoints(self):
         '''Get a sorted set of all points in the subContours
@@ -206,7 +208,7 @@ class CellNetwork(object):
                     # Aka, there are not enough points to make a triangle...
                     problemVals.add(v)
                     problemSCs.update(scInds)
-        problemValuePairs = [self.subContours[i].values for i in problemSCs]
+        problemValuePairs = [ self.subContours[i].values for i in problemSCs ]
         return sorted(problemVals),sorted(problemValuePairs)
     
     def LimitPointsBetweenNodes(self,numInteriorPointsDict,interpolate=True,checkForDegeneracy=True):
