@@ -1238,6 +1238,13 @@ def GetEdgeGroups(edges,valuePairs,eliminateSameCellBoundaries=True):
              edgeGroups )
 
 def getAmbiguousCrossingPoints(arrayWithBorder):
+    '''Find all spots in an array where an ambiguous intersection occurs,
+       namely a point surrrounded by a checkerboard pattern, i.e.:
+       ****
+       *AB*
+       *BA*
+       ****
+       '''
     a = arrayWithBorder
     return np.transpose(np.where(np.all([ a[:-1,:-1] == a[1:,1:],
                                           a[:-1,1:]  == a[1:,:-1],
