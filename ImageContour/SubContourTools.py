@@ -11,7 +11,7 @@ import operator
 from operator import itemgetter
 
 import numpy as np
-from np_utils import addBorder,groupByFunction,compose,ziptranspose
+from np_utils import addBorder,groupByFunction,compose,ziptranspose,deletecases
 
 import matplotlib.pyplot as plt
 
@@ -1221,7 +1221,7 @@ def GetEdgesAndValuePairsFromArray(arr,wrapX=False,wrapY=False):
        it over both x and y axes'''
     evpXY = [ GetDividingLinesAndValuePairsFromArray(arr,axis,wrap)
              for axis,wrap in [(0,wrapX),(1,wrapY)] ]
-    edges,valuePairs = map( np.concatenate,np.transpose(evpXY) )
+    edges,valuePairs = map( np.concatenate,ziptranspose(evpXY) )
     return edges,valuePairs
 
 def GetEdgeGroups(edges,valuePairs,eliminateSameCellBoundaries=True):
@@ -1250,3 +1250,29 @@ def getAmbiguousCrossingPoints(arrayWithBorder):
                                           a[:-1,1:]  == a[1:,:-1],
                                           a[:-1,:-1] != a[1:,:-1],
                                         ], axis=0 )))
+
+def firstOrOther(l,other=None):
+    return l[0] if len(l) else other
+
+def GetChainsFromConnections(connections,checkConnections=True):
+    '''Take a list of connections and return a list of connection chains
+       (usually one)'''
+    connections = deepcopy(connections) # Protect the input from modification
+    if checkConnections: # Check that there is no branching
+        assert all( len(v)<3 for k,v in connections.iteritems() ), 'Aborting; this network has branching'
+    
+    chains = []
+    while len(connections): # LOOP over possible chains
+        # Pick a starting point (an end point if possible)
+        currPt = firstOrOther( [ pt for pt,conn in connections.iteritems()
+                                    if len(conn)==1 ],
+                               connections.keys()[0] )
+        # Form a chain and move the current point forward
+        chain = [currPt]
+        currPt = connections.pop(currPt)[0]
+        while currPt: # LOOP to fill a chain, stop on an invalid
+            chain.append(currPt)
+            connections[currPt] = deletecases(connections[currPt], [chain[-2]])
+            currPt = firstOrOther(connections.pop(currPt,[]))
+        chains.append(chain)
+    return chains
