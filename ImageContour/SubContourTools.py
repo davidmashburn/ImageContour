@@ -11,16 +11,18 @@ import operator
 from operator import itemgetter
 
 import numpy as np
-from np_utils import addBorder,groupByFunction,compose,ziptranspose,deletecases
 
 import matplotlib.pyplot as plt
 
 import ImageContour
 
 #from list_utils:
-from np_utils import totuple,interpGen,flatten,ziptranspose
+from np_utils import ( totuple, interpGen, flatten, ziptranspose,
+                       groupByFunction, getChainsFromConnections )
+#from func_utils
+from np_utils import compose
 #from np_utils:
-from np_utils import limitInteriorPoints,limitInteriorPointsInterpolating
+from np_utils import limitInteriorPoints, limitInteriorPointsInterpolating, addBorder
 
 def GetValuesAroundSCPoint(watershed2d,point):
     '''Given any junction in a pixel array, get the set of unique values that surround it;
@@ -1250,29 +1252,3 @@ def getAmbiguousCrossingPoints(arrayWithBorder):
                                           a[:-1,1:]  == a[1:,:-1],
                                           a[:-1,:-1] != a[1:,:-1],
                                         ], axis=0 )))
-
-def firstOrOther(l,other=None):
-    return l[0] if len(l) else other
-
-def GetChainsFromConnections(connections,checkConnections=True):
-    '''Take a list of connections and return a list of connection chains
-       (usually one)'''
-    connections = deepcopy(connections) # Protect the input from modification
-    if checkConnections: # Check that there is no branching
-        assert all( len(v)<3 for k,v in connections.iteritems() ), 'Aborting; this network has branching'
-    
-    chains = []
-    while len(connections): # LOOP over possible chains
-        # Pick a starting point (an end point if possible)
-        currPt = firstOrOther( [ pt for pt,conn in connections.iteritems()
-                                    if len(conn)==1 ],
-                               connections.keys()[0] )
-        # Form a chain and move the current point forward
-        chain = [currPt]
-        currPt = connections.pop(currPt)[0]
-        while currPt: # LOOP to fill a chain, stop on an invalid
-            chain.append(currPt)
-            connections[currPt] = deletecases(connections[currPt], [chain[-2]])
-            currPt = firstOrOther(connections.pop(currPt,[]))
-        chains.append(chain)
-    return chains
