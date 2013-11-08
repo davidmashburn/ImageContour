@@ -22,20 +22,12 @@ from np_utils import ( totuple, interpGen, flatten, ziptranspose,
 #from func_utils
 from np_utils import compose
 #from np_utils:
-from np_utils import limitInteriorPoints, limitInteriorPointsInterpolating, addBorder
+from np_utils import ( limitInteriorPoints, limitInteriorPointsInterpolating,
+                       addBorder, getValuesAroundPointInArray )
 
-def GetValuesAroundSCPoint(watershed2d,point):
-    '''Given any junction in a pixel array, get the set of unique values that surround it;
-       there are always 4 pixels around a junction
-       there is one more junction in each direction than there are pixels
-       (but one less internal junction)
-       "point" must be the index of an internal junction'''
-    x,y = point
-    if  0 < x <= watershed2d.shape[0] and  0 < y <= watershed2d.shape[1]:
-        return tuple(np.unique( watershed2d[x-1:x+1,y-1:y+1] ).tolist())
-    else:
-        print "THIS POINT IS NOT INTERIOR TO THE ARRAY; THERE ARE NOT 4 POINTS AROUND IT!"
-        return (None,None,None)
+def GetValuesAroundSCPoint(watershed2d,point,wrapX=False,wrapY=False):
+    vals = getValuesAroundPointInArray(watershed2d,point,wrapX,wrapY)
+    return ( tuple(vals.tolist()) if vals!=None else (None,None,None) )
 
 class SubContour(object):
     '''A class to hold the data for a single SubContour (basically a connected list of points)
@@ -448,11 +440,16 @@ class CellNetwork(object):
     def cellPlot(self,*args,**kwds):
         '''Plot the full contours in a way that can be overlaid on an imshow
            State: Access only'''
+        if 'plotFunction' in kwds:
+            plotFunction = kwds['plotFunction']
+            del kwds['plotFunction']
+        else:
+            plotFunction = plt.plot 
         contourPoints = { v:self.GetContourPoints(v) for v in self.contourOrderingByValue.keys() }
         for v in contourPoints.keys():
             x = [ p[0]-0.5 for p in contourPoints[v] ]
             y = [ p[1]-0.5 for p in contourPoints[v] ]
-            _=plt.plot( y,x, *args, **kwds )
+            _=plotFunction( y,x, *args, **kwds )
     
     def scPlotT(self,*args,**kwds):
         '''Plot the subContours in a way that can be overlaid on a transposed imshow
