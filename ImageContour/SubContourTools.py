@@ -20,7 +20,8 @@ import ImageContour
 from np_utils import ( totuple, interpGen, flatten, ziptranspose, roll,
                        deletecases,partition, polyCirculationDirection,
                        groupByFunction, getElementConnections,
-                       getChainsFromConnections )
+                       getChainsFromConnections, removeDuplicates,
+                       removeAdjacentDuplicates )
 #from func_utils
 from np_utils import compose
 #from np_utils:
@@ -514,7 +515,12 @@ def SubContourListfromCVLSList(cVLS_List,startPointValues_List=[],endPointValues
             for i,cvls in enumerate(cVLS_List)]
 
 def GetCellNetwork( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(0,0), ):
-    '''Basically a constructor for CellNetwork based on a watershed array'''
+    '''Basically a constructor for CellNetwork based on a watershed array
+       
+       watershed2d is a watershed-like 2d array (indexed block values)
+       allValues is optional and specifies which value in the array to include in the network
+       bgVals are the values ignored as background (at least 0 should always be used)
+       scale and offset define a non-rotational transform over the output points'''
     if allValues==None:
         allValues = np.unique(watershed2d)
     allValues = np.array(allValues).tolist() # force numpy arrays to lists
@@ -1282,117 +1288,33 @@ def GetContourOrderingByValue(cellIDs,subContourValues,subContourPoints):
     return contourOrderingByValue
 
 
-def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(0,0),wrapX=False,wrapY=False ):
-    '''Basically a constructor for CellNetwork based on a watershed array'''
-    cellIDs = deletecases( ( np.unique(watershed2d)
-                             if allValues==None else         # rebuild allValues if None is passed
-                             np.array(allValues) ).tolist(), # force numpy array to list
-                           bgVals )                          # remove background values
-    
-    # Get Edges
-    edges,valuePairs = GetEdgesAndValuePairsFromArray(arr,wrapX=wrapX,wrapY=wrapY)
-
-    # (convert points in e to wrapped coordinates)
-    if wrapX:
-        wh=np.where(e[:,:,0]==arr.shape[0])
-        e[wh[0],wh[1],0] = 0
-        e[wh[0]] = e[wh[0]][:,::-1] # flip so the 0 comes first (aka sorted properly...)
-    
-    if wrapY:
-        # Is this right yet?
-        wh=np.where(e[:,:,1]==arr.shape[1])
-        e[wh[0],wh[1],1] = 0
-        e[wh[0]] = e[wh[0]][:,::-1] # flip so the 0 comes first (aka sorted properly...)
-
-    # Ambiguous point testing step
-    ambiguousCrossingPoints = GetAmbiguousCrossingPoints(arr)
-    assert len(ambiguousCrossingPoints)==0, 'Ambiguous crossing points at: '+str(ambiguousCrossingPoints.tolist())
-
-    # SC step: Group edges by value pair and then form chains that divide each cell pair
-    edgeGroups = GetEdgeGroups(e,vP,eliminateSameCellBoundaries=True)
-    cellBoundariesMulti = { k:getChainsFromConnections( getElementConnections(totuple(v)) )
-                            for k,v in edgeGroups.items() }
-    assert all( len(i)==1 for i in cellBoundariesMulti.values() ),'Some cells touch in multiple places'
-    cellBoundaries = { k:v[0] for k,v in cellBoundariesMulti.iteritems() } # We should be able to deal with one chain per cell pair
-
-    # This is where I need to generalize the code:
-    ###########################################################################################################################################
-    # *Here*: eliminate all edges on the poles:
-    # 1. Replace points (0,x)->(0,0) and (last,x)->(last,0)
-    # 2. Merge any contiguous polar points together using removeAdjacentDuplicates
-    _collapsePoles = lambda pts: [ ( (0,0)            if p[1]==0 else
-                                     (0,arr.shape[1]) if p[1]==arr.shape[1] else
-                                     p )
-                                  for p in pts ]
-    scPtsByPairID = { k : removeAdjacentDuplicates(_collapsePoles(pts))
-                     for k,pts in cellBoundaries.iteritems()
-                     if 0 not in k }
-    
-    subContourValues,subContourPoints = ziptranspose(scPtsByPairID.items())
-    contourOrderingByValue = GetContourOrderingByValue(cellIDs,subContourValues,subContourPoints)
-    subContours = [ SCT.SubContour( points=points,
-                                    values=values,
-                                    startPointValues = SCT.GetValuesAroundSCPoint( arr, points[0], wrapX=True ),
-                                    endPointValues   = SCT.GetValuesAroundSCPoint( arr, points[-1], wrapX=True ) )
-                   for values,points in zip(subContourValues,subContourPoints) ]
-    return SCT.CellNetwork( subContours=subContours,
-                            contourOrderingByValue=contourOrderingByValue,
-                            allValues=cellIDs )
-    
-    
-    
-    ################ OLD VERSION:
-    
-    allValues = np.array(allValues).tolist() # force numpy arrays to lists
-    allValues = [ v for v in allValues if v not in bgVals ] # skip the background
-    
-    identifier=0 # unique id for each subContour
-    scList = []
-    contourOrderingByValue = {} # For each cellID, an ordered list of index to the scList/direction pairs that reconstruct the full contour
-    for v in allValues:
-        boundingRect=ImageContour.GetBoundingRect(watershed2d,v)
-        # No longer needed: #contour,turns,vals = ImageContour.GetContour(watershed[0],v,boundingRect=boundingRect,byNeighbor=True)
-        perimeterVals,perimeterList,scPointsList = ImageContour.GetPerimeterByNeighborVal(watershed2d,v,boundingRect=boundingRect,getSubContours=True)
-        numSCs=len(perimeterVals)
-        scPointsListAdj = []
-        for scp in scPointsList:
-            scpAdj = np.array(scp)+[boundingRect[0][0],boundingRect[1][0]] # Will need to - 0.5 to line up on an overlay
-            scpAdj = scpAdj*scale + offset
-            scPointsListAdj.append(scpAdj.tolist())
-        if len(perimeterList)>0:
-            contourOrderingByValue[v] = []
-            for i in range(numSCs):
-                newSC = SubContour( points           = scPointsListAdj[i],
-                                  # numPoints        = len(scPointsAdj[i]), # happens automatically
-                                    adjusted_length  = perimeterList[i],
-                                    values           = tuple(sorted([v,perimeterVals[i]])),
-                                    startPointValues = GetValuesAroundSCPoint( watershed2d, scPointsListAdj[i][0] ),
-                                    endPointValues   = GetValuesAroundSCPoint( watershed2d, scPointsListAdj[i][-1] ),
-                                    identifier=identifier )
-                matchingSCs = [ sc for sc in scList if sc.values==newSC.values ] # match any subcoutours in cVLS so far that are for the same pair of cells
-                matchingSCs = [ sc for sc in matchingSCs if totuple(sc.points[::-1])==totuple(newSC.points) ] # Only keep subcoutours where the points match the reverse of the points in newSC
-                                #sorted([newSC.points[0],newSC.points[-1]]) == sorted([sc.points[0],sc.points[-1]]) ] # Should only possibly find 1 match...
-                if matchingSCs==[]: # This is a new subContour, not a duplicate!
-                    scList.append(newSC)
-                    contourOrderingByValue[v].append( (identifier,True) )
-                    identifier+=1
-                else:
-                    matchingSCs[0].adjusted_length = min( matchingSCs[0].adjusted_length,
-                                                          newSC.adjusted_length ) # keep the minimum perimeter length...
-                    contourOrderingByValue[v].append( (matchingSCs[0].identifier,False) ) # False means the subcountour is backwards for this cell!
-    scList.sort( key = lambda x: x.values ) # was just cVLS.sort()... this works, I hope?
-    IDs = [sc.identifier for sc in scList]
-    for sc in scList:      # scrub the id's, probably not necessary... 
-        sc.identifier=None
-    
-    # Reindex after sorting...
-    for v in allValues:
-        contourOrderingByValue[v] = [ (IDs.index(i),d) for i,d in contourOrderingByValue[v] ]
-    
-    return CellNetwork( subContours=scList , contourOrderingByValue=contourOrderingByValue , allValues=allValues )
-
-def GetCellNetwork_NEW_NOWRAP( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(0,0) ):
-    '''Basically a constructor for CellNetwork based on a watershed array'''
+def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(0,0),
+                        wrapX=False, collapsePoles=False, deleteZeroContours=True ):
+    '''Basically a constructor for CellNetwork based on a watershed array
+       
+       This function gives an equivalent output to GetCellNetwork, but uses an
+           array-based methodology to get the main data and then uses a
+           chaining scheme to construct subContours and contour ordering
+           (the original method uses a crawling scheme instead, which
+            obviated the need for chaining)
+       This method is ~70% slower but has more available options
+       
+       watershed2d is a watershed-like 2d array (indexed block values)
+       allValues is optional and specifies which value in the array to include in the network
+       bgVals are the values ignored as background (at least 0 should always be used)
+       scale and offset define a non-rotational transform over the output points
+       
+       Generally, these default options should be used for the other 3 options:
+          wrapX=False, collapsePoles=False, deleteZeroContours=True
+       
+       Other useful modes are:
+         * include boundary mode:
+             wrapX=False, collapsePoles=False, deleteZeroContours=False
+         * cylindrical mode (include outer boundary and wrap around in the x-dimension):
+             wrapX=True, collapsePoles=False, deleteZeroContours=False
+         * shperical mode (wrap x and collapse y):
+             wrapX=True, collapsePoles=True, deleteZeroContours=True
+       '''
     arr = watershed2d # synonym
     cellIDs = deletecases( ( np.unique(arr)
                              if allValues==None else         # rebuild allValues if None is passed
@@ -1400,7 +1322,19 @@ def GetCellNetwork_NEW_NOWRAP( watershed2d,allValues=None,bgVals=(0,1),scale=1,o
                            bgVals )                          # remove background values
     
     # Get Edges
-    edges,valuePairs = GetEdgesAndValuePairsFromArray(arr)
+    edges,valuePairs = GetEdgesAndValuePairsFromArray(arr,wrapX=wrapX,wrapY=False)
+    
+    # (convert points in e to wrapped coordinates)
+    if wrapX:
+        wh=np.where(edges[:,:,0]==arr.shape[0])
+        edges[wh[0],wh[1],0] = 0
+        edges[wh[0]] = edges[wh[0]][:,::-1] # flip so the 0 comes first (aka sorted properly...)
+    
+    #if wrapY:
+    #    # Is this right yet?
+    #    wh=np.where(e[:,:,1]==arr.shape[1])
+    #    edges[wh[0],wh[1],1] = 0
+    #    edges[wh[0]] = edges[wh[0]][:,::-1] # flip so the 0 comes first (aka sorted properly...)
 
     # Ambiguous point testing step
     ambiguousCrossingPoints = GetAmbiguousCrossingPoints(arr)
@@ -1412,11 +1346,21 @@ def GetCellNetwork_NEW_NOWRAP( watershed2d,allValues=None,bgVals=(0,1),scale=1,o
                             for k,v in edgeGroups.items() }
     assert all( len(i)==1 for i in cellBoundariesMulti.values() ),'Some cells touch in multiple places'
     cellBoundaries = { k:v[0] for k,v in cellBoundariesMulti.iteritems() } # We should be able to deal with one chain per cell pair
+    scPtsByPairID = cellBoundaries
+    if collapsePoles:
+        # Eliminate all edges on the poles:
+        # 1. Replace points (0,x)->(0,0) and (last,x)->(last,0)
+        # 2. Merge any contiguous polar points together using removeAdjacentDuplicates
+        _collapsePoles = lambda pts: [ ( (0,0)            if p[1]==0 else
+                                         (0,arr.shape[1]) if p[1]==arr.shape[1] else
+                                         p )
+                                      for p in pts ]
+        scPtsByPairID = { k : removeAdjacentDuplicates(_collapsePoles(pts))
+                         for k,pts in scPtsByPairID.iteritems() }
+    if deleteZeroContours:
+        scPtsByPairID = { k:pts for k,pts in scPtsByPairID.iteritems()
+                                if 0 not in k }
 
-    scPtsByPairID = { k:pts for k,pts in cellBoundaries.iteritems()
-                            #if 0 not in k }                         # Skip the background?
-                            }
-    
     subContourValues,subContourPoints = ziptranspose(scPtsByPairID.items())
     contourOrderingByValue = GetContourOrderingByValue(cellIDs,subContourValues,subContourPoints)
     subContours = [ SubContour( points=points,
