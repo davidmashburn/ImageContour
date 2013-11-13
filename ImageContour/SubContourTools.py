@@ -32,6 +32,11 @@ def GetValuesAroundSCPoint(watershed2d,point,wrapX=False,wrapY=False):
     vals = getValuesAroundPointInArray(watershed2d,point,wrapX,wrapY)
     return ( tuple(vals.tolist()) if vals!=None else (None,None,None) )
 
+def _kwdPop(kwds,key,defaultValue):
+    '''If a dictionary has a key, pop the value and return it,
+       otherwise return defaultValue'''
+    return ( kwds.pop(key) if key in kwds else defaultValue )
+
 class SubContour(object):
     '''A class to hold the data for a single SubContour (basically a connected list of points)
        This was designed to replace the old and crufty cVLS (contour's values,length, and subcontour)
@@ -440,20 +445,6 @@ class CellNetwork(object):
         for sc in self.subContours:
             _=sc.plot(*args,**kwds)
     
-    def cellPlot(self,*args,**kwds):
-        '''Plot the full contours in a way that can be overlaid on an imshow
-           State: Access only'''
-        if 'plotFunction' in kwds:
-            plotFunction = kwds['plotFunction']
-            del kwds['plotFunction']
-        else:
-            plotFunction = plt.plot 
-        contourPoints = { v:self.GetContourPoints(v) for v in self.contourOrderingByValue.keys() }
-        for v in contourPoints.keys():
-            x = [ p[0]-0.5 for p in contourPoints[v] ]
-            y = [ p[1]-0.5 for p in contourPoints[v] ]
-            _=plotFunction( y,x, *args, **kwds )
-    
     def scPlotT(self,*args,**kwds):
         '''Plot the subContours in a way that can be overlaid on a transposed imshow
            (matches closely with diagramPlot in VFMLite)
@@ -461,16 +452,25 @@ class CellNetwork(object):
         for sc in self.subContours:
             _=sc.plotT(*args,**kwds)
     
-    def cellPlotT(self,*args,**kwds):
-        '''Plot the full contours in a way that can be overlaid on a transposed imshow
-           (matches closely with diagramPlot in VFMLite)
+    def cellPlot(self,*args,**kwds):
+        '''Plot the full contours in a way that can be overlaid on an imshow
            State: Access only'''
+        plotFunction = _kwdPop( kwds, 'plotFunction', plt.plot )
+        reverseXY    = _kwdPop( kwds, 'reverseXY'   , False    )
+        
         contourPoints = { v:self.GetContourPoints(v) for v in self.contourOrderingByValue.keys() }
         for v in contourPoints.keys():
             x = [ p[0]-0.5 for p in contourPoints[v] ]
             y = [ p[1]-0.5 for p in contourPoints[v] ]
-            _=plt.plot( x,y, *args, **kwds )
-
+            x,y = (y,x) if reverseXY else (x,y)
+            _=plotFunction( y,x, *args, **kwds )
+    
+    def cellPlotT(self,*args,**kwds):
+        '''Plot the full contours in a way that can be overlaid on a transposed imshow
+           (matches closely with diagramPlot in VFMLite)
+           State: Access only'''
+        kwds['reverseXY'] = True
+        return self.cellPlot(*args,**kwds)
 
 def GetFlatDataFromCellNetwork(cn):
     '''Convert a CellNetwork with all its nested objects into flat datastructure
