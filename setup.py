@@ -18,6 +18,6 @@ setup(
     install_requires=[
                       'numpy>=1.0',
                       'matplotlib>=1.0',
-                      'np_utils>=0.3'
+                      'np_utils>=0.3.1.1'
                      ],
 )
