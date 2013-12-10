@@ -585,6 +585,21 @@ def GetXYListAndPolyListFromCellNetworkList(cellNetworkList,closeLoops=True):
 def GetCVDListFromCellNetworkList(cellNetworkList):
     return [ cn.GetCellularVoronoiDiagram() for cn in cellNetworkList ]
 
+def GetCellNetworkWithCellsRemoved(cn,cellsToRemove):
+    ''''Replace cells with holes in a copy of cn'''
+    cnClip = deepcopy(cn)
+    # Remove cells from sc.values and then delete sc's without values
+    for sc in cnClip.subContours:
+        sc.values = sorted(set(sc.values).difference(cellsToRemove))
+    cnClip.subContours = [ ( sc if sc.values else None )
+                          for sc in cnClip.subContours ]
+    # Delete cells from contourOrderingByValue and allValues and then re-index everything
+    for c in cellsToRemove:
+        del cnClip.contourOrderingByValue[c]
+    cnClip.allValues = [ i for i in cnClip.allValues if i not in cellsToRemove ]
+    cnClip.CleanUpEmptySubContours()
+    return cnClip
+
 def GetCellNetworkListWithLimitedPointsBetweenNodes(cellNetworkList,splitLength=1,fixedNumInteriorPoints=None,interpolate=True,checkForDegeneracy=True):
     '''Based on matching subcontours by value pair, this function defines a fixed number of interior points for each subcontour
        and then applies this "trimming" procedure equitably to each frame in cellNetworkList (uses LimitPointsBetweenNodes)'''
