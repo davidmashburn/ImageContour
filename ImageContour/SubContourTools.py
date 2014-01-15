@@ -9,6 +9,7 @@ import json
 import itertools
 import operator
 from operator import itemgetter
+from collections import Counter
 
 import numpy as np
 
@@ -1386,3 +1387,109 @@ def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(
     return CellNetwork( subContours=subContours,
                         contourOrderingByValue=contourOrderingByValue,
                         allValues=cellIDs )
+
+###########################################################################
+##    Some helper functions for dealing with (points,edges,cells) data   ##
+###########################################################################
+
+def _xMod(pts,m):
+    return [ (int(x%m),int(y)) for (x,y) in pts ]
+
+def _deIndexList(allVals,indexLoL):
+    return [ [ allVals[vid-1]
+              for vid in vIDs ]
+            for vIDs in indexLoL ]
+
+def _pointsFromEdgesByID(allPoints,edgesByPtID):
+    '''Takes a list of edges and returns a list of pairs of xy points'''
+    return _deIndexList(allPoints,edgesByPtID)
+
+def _getEdgesFromCellsByID(allEdges,cellsByEdgeID):
+    '''Takes a list of cells and returns a list of lists of edges'''
+    return _deIndexList(allEdges,cellsByEdgeID)
+
+def _getPointPairsFromCellsByID(allPointPairs,cellsByEdgeID):
+    '''Takes a list of cells and returns a list of lists of pairs of xy points'''
+    return _deIndexList(allPointPairs,cellsByEdgeID)
+
+def getSortedPointsAndEdges(cn,arr):
+    allValues = np.unique(arr)
+    allPoints = sorted(set(_xMod(cn.GetAllPoints(),arr.shape[0])))
+    pindDict = { pt:(i+1) for i,pt in enumerate(allPoints) }
+    # Create an "enhanced" edge list that has elements like:
+    # (sorted point indices, )
+    allEdgesAsPtIDs_t = [ ( sorted([ pindDict[tuple(p)]
+                                    for p in _xMod([p1,p2],arr.shape[0]) ]),
+                            sc.values )
+                         for sc in cn.subContours
+                         for p1,p2 in zip(sc.points[:-1],sc.points[1:]) ]
+    allEdgesAsPtIDs = sorted({ tuple(edge) for edge,cellIDs in allEdgesAsPtIDs_t })
+    eindDict = { tuple(edge):(i+1) for i,edge in enumerate(allEdgesAsPtIDs) }
+    allCellsAsEdgeIDs = [ sorted({ eindDict[tuple(edge)]
+                                 for edge,cellIDs in allEdgesAsPtIDs_t
+                                 if c in cellIDs })
+                        for c in allValues ]
+    
+    orderedPointsByCell = { cellID:removeDuplicates(_xMod(cn.GetContourPoints(cellID),arr.shape[0]))
+                           for cellID in cn.contourOrderingByValue.keys() }
+    orderedPointIDsByCell = { k:[ pindDict[tuple(i)]
+                                 for i in v ]
+                             for k,v in orderedPointsByCell.items() }
+    pointPairsByCell = { k:map(tuple,map(sorted,zip(v,roll(v))))
+                        for k,v in orderedPointIDsByCell.items() }
+    #Good to here...
+    
+    #for c in allValues[:]:
+    #    for pp in pointPairsByCell[c]:
+    #        dplot( [allPoints[pp[0]-1],allPoints[pp[1]-1]], 'k-' )
+    
+    edgesByCell = [ [k,[ eindDict[i]
+                       for i in v
+                       if i in eindDict ]]
+                   for k,v in pointPairsByCell.items() ]
+    
+    BAD_PAIRS = [ [allPoints[i[0]-1],allPoints[i[1]-1]]
+                 for k,v in pointPairsByCell.items()
+                 for i in v
+                 if i not in eindDict ]
+    
+    print BAD_PAIRS, 'Not sure why these are here... ignored for the time being!'
+    
+    return allPoints,allEdgesAsPtIDs,allCellsAsEdgeIDs
+
+def getTripleJunctions(points,edges):
+    pointCounts = Counter( flatten(edges,2) )
+    pointCountBins = sorted(edgeCounts.values())
+    pointsByOccurrence = { c:sorted( k for k,v in edgeCounts.items() 
+                                       if v==c )
+                          for c in pointCountBins }
+    nonJunctionPoints = set(points[i-1] for i in pointsByOccurrence[2])
+    junctionPoints = sorted(set(points).difference(nonJunctionPoints))
+    return junctionPoints
+
+def SplitAtMissedTJsAndSimplifyMesh(cellNetwork,junctionPoints):
+    junctionPoints = set(map(tuple,junctionPoints))
+    cn = deepcopy(cellNetwork)
+    for sc in cn.subContours:
+        sc.points = removeAdjacentDuplicates(sc.points) # first, clean up duplicate runs of items
+        jpts = sorted(set(map(tuple,sc.points)).intersection(junctionPoints))
+        if len(jpts)>2:
+            indsOfJpts = [ i for i in range(len(sc.points))
+                             if tuple(sc.points[i]) in jpts]
+            indsOfJpts = removeDuplicates([0]+indsOfJpts+[len(sc.points)-1])
+            #if indsOfJpts[-1]!=0:
+            #    indsOfJpts.prepend(0)
+            #if indsOfJpts[-1]!=len(sc.points)-1:
+            #    indsOfJpts.append(len(sc.points)-1)
+            newPtLists = [ sc.points[i:j+1] for i,j in zip(indsOfJpts[:-1],indsOfJpts[1:]) ]
+            
+            #print sc.points
+            #print len(newPtLists)
+            #print newPtLists
+            
+            sc.points = newPtLists[0]
+            for pts in newPtLists[1:]:
+                cn.subContours.append(SubContour(points=pts,values=sc.values))
+                cn.subContours[-1].points = [cn.subContours[-1].points[0],cn.subContours[-1].points[-1]]
+        sc.points = [sc.points[0],sc.points[-1]]
+    return cn
