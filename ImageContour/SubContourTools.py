@@ -1004,10 +1004,9 @@ def _loadCNListPrevNextFromJsonFile(cnListPrevAndNextFile):
 
 
 def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,forceRemake=False,
-                              bgVals=(0,1),scale=1,offset=(0,0), ):
+                                        bgVals=(0,1),scale=1,offset=(0,0), ):
     '''Get matched before and after CellNetwork lists from a waterArr.
        This function will optionally save and load to a pickle file (extraRemoveValsByFrame MUST be None)'''
-
     allValsByFrame = [ sorted( set(np.unique(i)).difference(bgVals) )
                       for i in waterArr ] # Skip background
     
