@@ -178,6 +178,14 @@ class CellNetwork(object):
                                          if v!=1 ] ))
     
     def GetAllPoints(self):
+        '''Get a set of all points in the subContours
+           Sorting to done based on the order points appear in the subContours
+           This ordering helps ensure that matched CN's translate properly to
+           matched cvd's
+           State: Access only'''
+        return removeDuplicates([ tuple(pt) for sc in self.subContours for pt in sc.points ])
+    
+    def GetAllPointsSorted(self):
         '''Get a sorted set of all points in the subContours
            State: Access only'''
         return sorted(set( [ tuple(pt) for sc in self.subContours for pt in sc.points ] ))
