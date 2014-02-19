@@ -19,7 +19,9 @@ import ImageContour
 
 #from list_utils:
 from np_utils import ( totuple, interpGen, flatten, ziptranspose, roll,
-                       deletecases,partition, polyCirculationDirection,
+                       deletecases, partition,
+                       polyArea, polyPerimeter, polyCentroid,
+                       polyCirculationDirection,
                        groupByFunction, getElementConnections,
                        getChainsFromConnections, removeDuplicates,
                        removeAdjacentDuplicates )
@@ -170,12 +172,43 @@ class CellNetwork(object):
             polyList.append( [ v,indexList ] )
         return [xyList,polyList]
         
-    def UpdateAllValues(self):
+    def UpdateAllValues(self,bgVals=(0,1)):
         '''Go through the values in all the subContours and collect a list of all of them
            State: Changes state of allValues, but only to to be more consistent'''
         self.allValues = sorted(set( [ v for sc in self.subContours 
                                          for v in sc.values
-                                         if v!=1 ] ))
+                                         if v not in bgVals ] ))
+    def GetAllValues(self,update=True,bgVals=(0,1)):
+        '''Update all values and then return them.
+           Not efficient for multiple uses.
+           State: Changes the state of allValues when update=True, but only to be more consistent'''
+        if update:
+            self.UpdateAllValues(bgVals=bgVals)
+        return self.allValues
+    
+    def GetCellPerimeters(self,update=False,bgVals=(0,1)):
+        '''For each cell in allValues, get the cell perimeter
+           State: Changes the state of allValues when update=True, but only to be more consistent'''
+        if update:
+            self.UpdateAllValues(bgVals=bgVals)
+        return [ polyPerimeter(self.GetContourPoints(v))
+                for v in self.allValues ]
+    
+    def GetCellAreas(self,update=False,bgVals=(0,1)):
+        '''For each cell in allValues, get the cell area
+           State: Changes the state of allValues when update=True, but only to be more consistent'''
+        if update:
+            self.UpdateAllValues(bgVals=bgVals)
+        return [ polyArea(self.GetContourPoints(v,closeLoop=False))
+                for v in self.allValues ]
+    
+    def GetCellCentroids(self,update=False,bgVals=(0,1)):
+        '''For each cell in allValues, get the cell centroid
+           State: Changes the state of allValues when update=True, but only to be more consistent'''
+        if update:
+            self.UpdateAllValues(bgVals=bgVals)
+        return [ polyCentroid(self.GetContourPoints(v,closeLoop=False))
+                for v in self.allValues ]
     
     def GetAllPoints(self):
         '''Get a set of all points in the subContours
