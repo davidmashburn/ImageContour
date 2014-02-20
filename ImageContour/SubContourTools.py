@@ -39,6 +39,7 @@ def GetValuesAroundSCPoint(watershed2d,point,wrapX=False,wrapY=False):
 def BreakLinesIntoEvenPieces(points,nSegments):
     '''Take the points from a multi-line and re-interpolate the
        points to get nSegments evenly spaced segments'''
+    nSegments = (1 if nSegments<1 else nSegments)
     ptsArr = np.array(points)
     nodalLengths = np.concatenate([ [0], np.cumsum(pointDistance(ptsArr[:-1],ptsArr[1:])) ])
     totalLength = nodalLengths[-1]
