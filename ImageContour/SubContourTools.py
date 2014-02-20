@@ -24,7 +24,8 @@ from np_utils import ( totuple, interpGen, flatten, ziptranspose, roll,
                        polyCirculationDirection,
                        groupByFunction, getElementConnections,
                        getChainsFromConnections, removeDuplicates,
-                       removeAdjacentDuplicates )
+                       removeAdjacentDuplicates,
+                       interp, pointDistance )
 #from func_utils
 from np_utils import compose
 #from np_utils:
@@ -34,6 +35,22 @@ from np_utils import ( limitInteriorPoints, limitInteriorPointsInterpolating,
 def GetValuesAroundSCPoint(watershed2d,point,wrapX=False,wrapY=False):
     vals = getValuesAroundPointInArray(watershed2d,point,wrapX,wrapY)
     return ( tuple(vals.tolist()) if vals!=None else (None,None,None) )
+
+def BreakLinesIntoEvenPieces(points,nSegments):
+    '''Take the points from a multi-line and re-interpolate the
+       points to get nSegments evenly spaced segments'''
+    ptsArr = np.array(points)
+    nodalLengths = np.concatenate([ [0], np.cumsum(pointDistance(ptsArr[:-1],ptsArr[1:])) ])
+    totalLength = nodalLengths[-1]
+    splitPoints = np.arange(0,totalLength+1e-10,totalLength/nSegments)[1:-1]
+    indsBefore = np.array([ np.where(nodalLengths<=s)[0][-1] for s in splitPoints ])
+    if len(indsBefore)>0:
+        interpBefore,interpAfter = nodalLengths[indsBefore,],nodalLengths[indsBefore+1,]
+        floatPart = (splitPoints-interpBefore)/(interpAfter-interpBefore)
+        interpIndices = [0] + (indsBefore+floatPart).tolist() + [-1]
+    else:
+        interpIndices = [0,-1]
+    return [ interp(ptsArr,i) for i in interpIndices ]
 
 def _kwdPop(kwds,key,defaultValue):
     '''If a dictionary has a key, pop the value and return it,
@@ -663,6 +680,42 @@ def GetCellNetworkListWithLimitedPointsBetweenNodes(cellNetworkList,splitLength=
     cellNetworkListNew = deepcopy(cellNetworkList) # otherwise, we'd also change the input argument in the outside world!
     for cn in cellNetworkListNew:
         cn.LimitPointsBetweenNodes(numInteriorPointsDict,interpolate=interpolate,checkForDegeneracy=False)
+    
+    if checkForDegeneracy:
+        problemValsList,problemValuePairsList = ziptranspose([ cn.CheckForDegenerateContours() for cn in cellNetworkListNew ])
+        if flatten(problemValsList)!=[]:
+            print 'All degenerate values:',sorted(set(flatten(problemValsList)))
+            print 'Degenerate values by frame:'
+            for i,problemVals in enumerate(problemValsList):
+                if problemVals!=[]:
+                    print ' ',i,':',problemVals
+            print 'Degenerate contours (zero area) found between these cellIDs on these frames!'
+            for i,problemValuePairs in enumerate(problemValuePairsList):
+                if problemValuePairs!=[]:
+                    print ' ',i,':',problemValuePairs
+            raise DegenerateNetworkException('Degeneracy check failed!')
+    
+    return cellNetworkListNew
+
+def GetCellNetworkListWithLimitedPointsBetweenNodes_FullInterpolation(cellNetworkList,splitLength,checkForDegeneracy=True):
+    '''Based on matching subcontours by value pair, this function defines a fixed number of interior points for each subcontour
+       and then applies this "trimming" procedure equitably to each frame in cellNetworkList (uses BreakLinesIntoEvenPieces)'''
+    allPairs = sorted(set( [ tuple(sc.values) for cn in cellNetworkList for sc in cn.subContours ] )) # Value pairs...
+    
+    # Build the numInteriorPointsDict:
+    # minLength is the length of the shortest subcountour between cells p[0] and p[1] from all frames
+    minLength = { p : min( [ sum(pointDistance(sc.points[:-1],sc.points[1:]))
+                            for cn in cellNetworkList
+                            for sc in cn.subContours
+                            if tuple(sc.values)==p ] )
+                 for p in allPairs }
+    nSegmentsDict = { p:int(minLength[p]/splitLength) for p in allPairs }
+    
+    cellNetworkListNew = deepcopy(cellNetworkList) # otherwise, we'd also change the input argument in the outside world!
+    for cn in cellNetworkListNew:
+        for sc in cn.subContours:
+            sc.points = BreakLinesIntoEvenPieces(sc.points,nSegmentsDict[tuple(sc.values)])
+            sc.numPoints = len(sc.points)
     
     if checkForDegeneracy:
         problemValsList,problemValuePairsList = ziptranspose([ cn.CheckForDegenerateContours() for cn in cellNetworkListNew ])
