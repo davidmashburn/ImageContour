@@ -13,24 +13,45 @@ from collections import Counter
 
 import numpy as np
 
+from matplotlib import mpl
 import matplotlib.pyplot as plt
 
 import ImageContour
 
 #from list_utils:
-from np_utils import ( totuple, interpGen, flatten, ziptranspose, roll,
-                       deletecases, partition,
-                       polyArea, polyPerimeter, polyCentroid,
-                       polyCirculationDirection,
-                       groupByFunction, getElementConnections,
-                       getChainsFromConnections, removeDuplicates,
-                       removeAdjacentDuplicates,
-                       interp, pointDistance )
+from np_utils import ( totuple, interp, interpGen, flatten, ziptranspose,
+                       roll, removeDuplicates, removeAdjacentDuplicates,
+                       deletecases, partition, groupByFunction,
+                       getElementConnections, getChainsFromConnections, )
+#from gen_utils
+from np_utils import minmax
 #from func_utils
 from np_utils import compose
 #from np_utils:
-from np_utils import ( limitInteriorPoints, limitInteriorPointsInterpolating,
+from np_utils import ( polyArea, polyPerimeter, polyCentroid,
+                       polyCirculationDirection,pointDistance,
+                       limitInteriorPoints, limitInteriorPointsInterpolating,
                        addBorder, getValuesAroundPointInArray )
+
+temperatureCmap = mpl.colors.LinearSegmentedColormap('temperature',
+                  {'red':  ((0.0, 0.0, 0.0),
+                            (0.25,0.5, 0.5),
+                            (0.5, 1.0, 1.0),
+                            (0.75,1.0, 1.0),
+                            (1.0, 1.0, 1.0)),
+                  
+                  'green': ((0.0, 0.0, 0.0),
+                            (0.25,0.5, 0.5),
+                            (0.5, 1.0, 1.0),
+                            (0.75,1.0, 1.0),
+                            (1.0, 0.0, 0.0)),
+                  
+                  'blue':  ((0.0, 0.0, 1.0),
+                            (0.25,1.0, 1.0),
+                            (0.5, 1.0, 1.0),
+                            (0.75,0.0, 0.0),
+                            (1.0, 0.0, 0.0))
+                 } )
 
 def GetValuesAroundSCPoint(watershed2d,point,wrapX=False,wrapY=False):
     vals = getValuesAroundPointInArray(watershed2d,point,wrapX,wrapY)
@@ -52,6 +73,15 @@ def BreakLinesIntoEvenPieces(points,nSegments):
     else:
         interpIndices = [0,-1]
     return [ interp(ptsArr,i) for i in interpIndices ]
+
+def _getReportPixel(arr):
+    '''Get a function that can be passed to the 'format_coord' method of a matplotlib axis'''
+    def report_pixel(x,y):
+        x,y,s = int(x+0.5),int(y+0.5),arr.shape
+        return ( "value=" + str(arr[y,x]) + "  x=" + str(x) + " y=" + str(y)
+                 if 0<x<s[1] and 0<y<s[0] else
+                 "x=" + str(x) + " y=" + str(y) )
+    return report_pixel
 
 def _kwdPop(kwds,key,defaultValue):
     '''If a dictionary has a key, pop the value and return it,
@@ -516,13 +546,18 @@ class CellNetwork(object):
         '''Plot the full contours in a way that can be overlaid on an imshow
            State: Access only'''
         plotFunction = _kwdPop( kwds, 'plotFunction', plt.plot )
+        colorList = _kwdPop( kwds, 'colorList', None )
         reverseXY    = _kwdPop( kwds, 'reverseXY'   , False    )
         
         contourPoints = { v:self.GetContourPoints(v) for v in self.contourOrderingByValue.keys() }
-        for v in contourPoints.keys():
+        for i,v in enumerate(sorted(contourPoints.keys())):
             x = [ p[0]-0.5 for p in contourPoints[v] ]
             y = [ p[1]-0.5 for p in contourPoints[v] ]
             x,y = (y,x) if reverseXY else (x,y)
+            if colorList!=None:
+                if colorList[i]==None: # skip cells with no color
+                    continue
+                kwds['color'] = colorList[i] # override the default color
             _=plotFunction( y,x, *args, **kwds )
     
     def cellPlotT(self,*args,**kwds):
@@ -531,6 +566,64 @@ class CellNetwork(object):
            State: Access only'''
         kwds['reverseXY'] = True
         return self.cellPlot(*args,**kwds)
+    
+    def _prepMinMaxForTPPlot(self,TorP,tpMinMax=None):
+        if tpMinMax==None:
+            mmin,mmax = minmax(deletecases(TorP,[None]))
+            tpMinMax = minmax([mmin,-mmin,mmax,-mmax])
+        return tpMinMax
+    
+    def _prepColorsForTorPPlot(self,TorP,kwds,tpMinMax=None):
+        cmap = _kwdPop( kwds, 'cmap', temperatureCmap )
+        tpMin,tpMax = self._prepMinMaxForTPPlot(TorP,tpMinMax)
+        norm = mpl.colors.Normalize(tpMin, tpMax)
+        scalarMap = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
+        colorList = [ ( None if tp==None else
+                        scalarMap.to_rgba(tp) )
+                     for tp in TorP ]
+        return colorList
+    
+    def tensionPlot(self,tensions,*args,**kwds):
+        linewidth = _kwdPop( kwds, 'linewidth', 2 )
+        tensionMinMax = _kwdPop( kwds, 'tensionMinMax', None )
+        colorList = self._prepColorsForTorPPlot(tensions,kwds,tensionMinMax)
+        
+        for color,sc in zip(colorList,self.subContours):
+            if color!=None:
+                kwds['color'],kwds['linewidth'] = 'k',linewidth+1
+                _=sc.plot(*args,**kwds)
+                kwds['color'],kwds['linewidth'] = color,linewidth
+                _=sc.plot(*args,**kwds)
+    
+    def pressurePlot(self,pressures,*args,**kwds):
+        kwds['plotFunction'] = _kwdPop( kwds, 'plotFunction', plt.fill ) # set default value
+        pressureMinMax = _kwdPop( kwds, 'pressureMinMax', None )
+        kwds['colorList'] = self._prepColorsForTorPPlot(pressures,kwds,pressureMinMax)
+        
+        self.cellPlot(*args,**kwds)
+        
+    def pressureImagePlot(self,pressures,waterArr,*args,**kwds):
+        kwds['cmap'] = _kwdPop( kwds, 'cmap', temperatureCmap ) # sets default value
+        pressureMinMax = _kwdPop( kwds, 'pressureMinMax', None )
+        pressureErrors = _kwdPop( kwds, 'pressureErrors', [0]*len(pressures) )
+        pMin,pMax = self._prepMinMaxForTPPlot(pressures,pressureMinMax)
+        
+        rPlot = np.zeros(waterArr.shape,dtype=np.float)
+        for i,v in enumerate(sorted(self.contourOrderingByValue.keys())):
+            p,pErr = pressures[i],pressureErrors[i]
+            if p!=None:
+                wh = np.where(waterArr==v)
+                nPts = len(wh[0])
+                rPlot[wh] = ( np.random.normal(p,pErr,nPts) if pErr!=0 else
+                              [p]*nPts )
+        
+        plt.imshow(rPlot,cmap=temperatureCmap,vmin=pMin,vmax=pMax)
+        plt.gca().format_coord = _getReportPixel(rPlot) # enable pixel reporting
+    
+    def pressureImageSpecklePlot(self,pressures,pressureErrors,waterArr,*args,**kwds):
+        kwds['pressureErrors'] = pressureErrors
+        self.pressureImagePlot(pressures,waterArr,*args,**kwds)
+    
 
 def GetFlatDataFromCellNetwork(cn):
     '''Convert a CellNetwork with all its nested objects into flat datastructure
