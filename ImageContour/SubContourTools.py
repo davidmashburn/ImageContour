@@ -123,10 +123,15 @@ class SubContour(object):
         '''Returns connection values at the endpoints that are not one of the 2 main values'''
         return tuple(sorted( set(self.startPointValues+self.endPointValues).difference(self.values) ))
     
+    def getLength(self):
+        '''Compute the sum of the distances between the points'''
+        return pointDistance(self.points[:-1],self.points[1:]).sum()
+    
     def plot(self,*args,**kwds):
         x = [ p[0]-0.5 for p in self.points ]
         y = [ p[1]-0.5 for p in self.points ]
         return plt.plot( y,x, *args, **kwds )
+    
     def plotT(self,*args,**kwds):
         x = [ p[0]-0.5 for p in self.points ]
         y = [ p[1]-0.5 for p in self.points ]
@@ -257,6 +262,10 @@ class CellNetwork(object):
             self.UpdateAllValues(bgVals=bgVals)
         return [ polyCentroid(self.GetContourPoints(v,closeLoop=False))
                 for v in self.allValues ]
+    
+    def GetSubContourLengths(self):
+        '''Compute the length of each subContour with sc.getLength'''
+        return [ sc.getLength() for sc in self.subContours ]
     
     def GetAllPoints(self):
         '''Get a set of all points in the subContours
