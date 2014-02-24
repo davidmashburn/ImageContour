@@ -553,6 +553,11 @@ class CellNetwork(object):
     
     def cellPlot(self,*args,**kwds):
         '''Plot the full contours in a way that can be overlaid on an imshow
+           Some default kwd args are not shown:
+             plotFunction=plt.plot
+             colorList=None
+             reverseXY=False
+           All other options are passed to the plotFunction (default plt.plot)
            State: Access only'''
         plotFunction = _kwdPop( kwds, 'plotFunction', plt.plot )
         colorList = _kwdPop( kwds, 'colorList', None )
@@ -571,7 +576,7 @@ class CellNetwork(object):
     
     def cellPlotT(self,*args,**kwds):
         '''Plot the full contours in a way that can be overlaid on a transposed imshow
-           (matches closely with diagramPlot in VFMLite)
+           Calls cellPlot with reverseXY=True
            State: Access only'''
         kwds['reverseXY'] = True
         return self.cellPlot(*args,**kwds)
@@ -593,23 +598,50 @@ class CellNetwork(object):
         return colorList
     
     def tensionPlot(self,tensions,*args,**kwds):
+        '''False color plot of tensions
+           Some kwdargs with default values are not shown:
+             linewidth=2
+             tensionMinMax=None
+             reverseXY = False
+           All other options are passed to cellPlot
+           State: Access only'''
         linewidth = _kwdPop( kwds, 'linewidth', 2 )
         tensionMinMax = _kwdPop( kwds, 'tensionMinMax', None )
+        reverseXY = _kwdPop( kwds, 'reverseXY', False )
         colorList = self._prepColorsForTorPPlot(tensions,kwds,tensionMinMax)
         
         for color,sc in zip(colorList,self.subContours):
             if color!=None:
+                scplot = sc.plotT if reverseXY else sc.plot
                 kwds['color'],kwds['linewidth'] = 'k',linewidth+1
-                _=sc.plot(*args,**kwds)
+                _=scplot(*args,**kwds)
                 kwds['color'],kwds['linewidth'] = color,linewidth
-                _=sc.plot(*args,**kwds)
+                _=scplot(*args,**kwds)
+    
+    def tensionPlotT(self,tensions,*args,**kwds):
+        '''tensionPlot, but with reverseXY=True (flips x and y axes)
+           State: Access only'''
+        kwds['reverseXY'] = True
+        return self.tensionPlot(tensions,*args,**kwds)
     
     def pressurePlot(self,pressures,*args,**kwds):
+        '''False color plot of pressures
+           Some kwdargs with default values are not shown:
+             plotFunction=plt.fill
+             pressureMinMax=None
+           All other options are passed to cellPlot
+           State: Access only'''
         kwds['plotFunction'] = _kwdPop( kwds, 'plotFunction', plt.fill ) # set default value
         pressureMinMax = _kwdPop( kwds, 'pressureMinMax', None )
         kwds['colorList'] = self._prepColorsForTorPPlot(pressures,kwds,pressureMinMax)
         
         self.cellPlot(*args,**kwds)
+    
+    def pressurePlotT(self,pressures,*args,**kwds):
+        '''pressurePlot, but with reverseXY=True (flips x and y axes)
+           State: Access only'''
+        kwds['reverseXY'] = True
+        return self.pressurePlot(pressures,*args,**kwds)
         
     def pressureImagePlot(self,pressures,waterArr,*args,**kwds):
         kwds['cmap'] = _kwdPop( kwds, 'cmap', temperatureCmap ) # sets default value
