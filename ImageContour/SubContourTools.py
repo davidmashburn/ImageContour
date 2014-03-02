@@ -325,7 +325,7 @@ class CellNetwork(object):
         return [ sc.getLength() for sc in self.subContours ]
     
     def GetAllPoints(self):
-        '''Get a set of all points in the subContours
+        '''Get a set of all points in the subContours (as 2-tuples)
            Sorting to done based on the order points appear in the subContours
            This ordering helps ensure that matched CN's translate properly to
            matched cvd's
