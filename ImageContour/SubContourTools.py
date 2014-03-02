@@ -141,6 +141,33 @@ class QuadPoint(object):
         self.values=values
         self.point=point
 
+def _getNumUniqueValues(values,bgVals):
+    '''Get the number of unique values connected to this junction.
+       All background values are considered the same'''
+    v,b = set(values),set(bgVals)
+    return len(v.difference(b)) + (1 if v.intersection(b) else 0)
+
+class Junction(object):
+    '''A class to hold information about a junction:
+       point: xy location
+       subContourIDs: integer ID's (indices) for connected subContours
+       cellIDs: integer ID's for connected cells
+       nConnections: number of connected subContours'''
+    point = None
+    subContourIDs = None
+    cellIDs = None
+    nConnections = None
+    def __init__(self,point,subContourIDs,cellIDs):
+        self.point = tuple(point)
+        self.subContourIDs = tuple(sorted(set(subContourIDs)))
+        self.cellIDs = tuple(sorted(set(cellIDs)))
+        self.nConnections = len(self.subContourIDs)
+    
+    def getNCellConnections(self,bgVals):
+        '''Get the number of unique cell ID's connected to this junction.
+           All background values are considered the same'''
+        return _getNumUniqueValues(self.cellIDs,bgVals)
+
 class DegenerateNetworkException(Exception):
     pass
 
@@ -155,10 +182,11 @@ class CellNetwork(object):
                                 # (<index into subContours>,<boolean that determines if this is forward (True) or backwards (False)>)
                                 # Don't use this directly, use the GetContourPoints method instead
                                 # no more negative values... (used to mean reverse the contour when inserting)
-    allValues = []
+    allValues = [] # list of all real CellIDs
+    # backgroundValues = [] # list of all background CellIDs
     def __init__(self,**kwds):
         '''Create a CellNetwork
-           All arguments are converted to attributes; all are optionally,
+           All arguments are converted to attributes; all are optional,
            but these are needed for functions to work:
              * subContours: list of SubContour objects
              * contourOrderingByValue: dictionary with keys that are cellIDs and tuple values like:
@@ -166,23 +194,59 @@ class CellNetwork(object):
                                          <boolean that determines if this is forward (True) or backwards (False)> )'''
         for k in kwds:
             self.__dict__[k] = kwds[k]
+        # if 'backgroundValues' not in kwds.keys():
+        #     self.backgroundValues = []
         if 'quadPoints' not in kwds.keys():
             if 'subContours' in kwds.keys():
                 self.UpdateQuadPoints()
     
+    def GetAllJunctions(self):
+        '''Get all the junctions in the network (points where sc's meet)'''
+        # Create a list of subContours ID's that are attached to each junction point
+        # And a list of cell ID values that are attached to each point
+        junctionSubContoursIDs = {}
+        junctionValues = {}
+        for i,sc in enumerate(self.subContours):
+            for endpt,values in [ (sc.points[0],sc.startPointValues),
+                                  (sc.points[-1],sc.endPointValues) ]:
+                pt = tuple(endpt)
+                junctionSubContoursIDs.setdefault(pt,set()).add(i)
+                junctionValues.setdefault(pt,set()).update(values)
+        allJunctionPoints = sorted(junctionSubContoursIDs.keys())
+        junctions = [ Junction(pt,scids,values)
+                     for pt in allJunctionPoints
+                     for scids in [junctionSubContoursIDs[pt]]
+                     for values in [junctionValues[pt]] ]
+        return junctions
+    
+    def GetJunctionsByNSubContours(self):
+        junctions = self.GetAllJunctions()
+        junctionsByNConns = {}
+        for j in junctions:
+            junctionsByNConns.setdefault(j.nConnections,[]).append(j)
+        return junctionsByNConns
+    
+    def GetJunctionsByNCells(self,bgVals):
+        junctions = self.GetAllJunctions()
+        junctionsByNConns = {}
+        for j in junctions:
+            junctionsByNConns.setdefault(j.getNCellConnections(bgVals),[]).append(j)
+        return junctionsByNConns
+    
     def UpdateQuadPoints(self):
         '''Update quadPoints from subContours
            State: Changes state of quadPoints variable, but only to be more consistent'''
-        quadPoints = sorted(set( [ (sc.startPointValues,tuple(sc.points[0])) for sc in self.subContours
-                                                                             if len(sc.startPointValues)==4 ] +
-                                 [ (sc.endPointValues,tuple(sc.points[-1])) for sc in self.subContours
-                                                                            if len(sc.endPointValues)==4 ] ))
+        startQuads = [ (sc.startPointValues,tuple(sc.points[0])) for sc in self.subContours
+                                                                 if len(sc.startPointValues)==4 ]
+        endQuads = [ (sc.endPointValues,tuple(sc.points[-1])) for sc in self.subContours
+                                                              if len(sc.endPointValues)==4 ]
+        quadPoints = sorted(set(startQuads+endQuads))
         self.quadPoints = [ QuadPoint(vals,pt) for vals,pt in quadPoints ]
+    
     def GetContourPoints(self,v,closeLoop=True):
         '''Get Contour points around a value v
            State: Access only'''
-        def reverseIfFalse(l,direction):
-            return ( l if direction else l[::-1] )
+        reverseIfFalse = lambda l,direction: ( l if direction else l[::-1] )
         scPointsList = [ reverseIfFalse( self.subContours[index].points, direction ) # reconstruct sc's, flipping if direction is False
                         for index,direction in self.contourOrderingByValue[v] ] # for each index & direction tuple
         contourPoints = [ totuple(pt) for scp in scPointsList for pt in scp[:-1] ] # start point is not end point; assumed to be cyclical...
@@ -766,20 +830,54 @@ def GetXYListAndPolyListFromCellNetworkList(cellNetworkList,closeLoops=True):
 def GetCVDListFromCellNetworkList(cellNetworkList):
     return [ cn.GetCellularVoronoiDiagram() for cn in cellNetworkList ]
 
-def GetCellNetworkWithCellsRemoved(cn,cellsToRemove):
+def GetDanglingBoundaryCells(cn,bgVals):
+    '''Get any boundary cells that are only connected to other boundary cells'''
+    bgSet = set(bgVals)
+    # For each sc, get the one or two connected cell ID's as a sorted tuple
+    cellIDsBySC = [ tuple(sorted(set(sc.values))) for sc in cn.subContours ]
+    # Get the ID's for all cells that contact the boundary, sorted
+    boundaryCells = sorted({ cid for cids in cellIDsBySC
+                                 if ( bgSet.intersection(cids) or
+                                      len(cids)==1 )
+                                 for cid in cids
+                                 if cid not in bgSet })
+    # Get all the real cell pairs (aka leave out the background)
+    cellPairs = sorted({ cids for cids in cellIDsBySC
+                              if not bgSet.intersection(cids) })
+    # Make a contact list for each cell
+    # Takes a cell ID as an index and returns all connecting cell ID's
+    cellContactDict = getElementConnections(cellPairs)
+    # Get all boundary cells with no neighbors besides other boundary cells
+    danglingCells = [ cid for cid in boundaryCells
+                          if not set(cellContactDict[cid]).difference(boundaryCells) ]
+    return danglingCells
+
+def GetCellNetworkWithCellsRemoved(cn,cellsToRemove,bgVals):
     ''''Replace cells with holes in a copy of cn'''
     cnClip = deepcopy(cn)
-    # Remove cells from sc.values and then delete sc's without values
-    for sc in cnClip.subContours:
-        sc.values = sorted(set(sc.values).difference(cellsToRemove))
-    cnClip.subContours = [ ( sc if sc.values else None )
+    
+    # Make the new set of background values including the cells to remove
+    newBgSet = set(bgVals) | set(cellsToRemove)
+    
+    # Replace background-background interfaces with None
+    cnClip.subContours = [ ( sc if set(sc.values).difference(newBgSet) else
+                             None )
                           for sc in cnClip.subContours ]
     # Delete cells from contourOrderingByValue and allValues and then re-index everything
     for c in cellsToRemove:
         del cnClip.contourOrderingByValue[c]
-    cnClip.allValues = [ i for i in cnClip.allValues if i not in cellsToRemove ]
+    cnClip.allValues = [ v for v in cnClip.allValues if v not in cellsToRemove ]
     cnClip.CleanUpEmptySubContours()
     return cnClip
+
+def ClipDanglingBoundaryCells(cn,bgVals):
+    '''Remove all cells that only have neighbors that are also boundary cells
+       Returns the new CellNetwork and the new backround values
+         (which now include these cells)'''
+    cellsClip = GetDanglingBoundaryCells(cn,bgVals)
+    cnClip = GetCellNetworkWithCellsRemoved(cn,cellsClip,bgVals)
+    newBgVals = sorted(set(bgVals) | set(cellsClip))
+    return cnClip,newBgVals
 
 def GetCellNetworkListWithLimitedPointsBetweenNodes(cellNetworkList,splitLength=1,fixedNumInteriorPoints=None,interpolate=True,checkForDegeneracy=True):
     '''Based on matching subcontours by value pair, this function defines a fixed number of interior points for each subcontour
