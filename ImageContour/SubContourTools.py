@@ -659,11 +659,11 @@ class CellNetwork(object):
             _=self.scPlot(*args,**kwds)
         
         reverseXY = kwdPop( kwds, 'reverseXY', False ) # must do this after the self.scPlot...
-        scplot = ( sc.plotT if reverseXY else sc.plot )
         
         plotList = []
         for color,sc in zip(colorList,self.subContours):
             if color!=None:
+                scplot = ( sc.plotT if reverseXY else sc.plot )
                 kwds['color'],kwds['linewidth'] = color,linewidth
                 plotList.append(  scplot(*args,**kwds)  )
         return plotList
