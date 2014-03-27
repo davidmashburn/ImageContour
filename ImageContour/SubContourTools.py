@@ -598,15 +598,21 @@ class CellNetwork(object):
     def scPlot(self,*args,**kwds):
         '''Plot the subContours in a way that can be overlaid on an imshow
            State: Access only'''
-        for sc in self.subContours:
-            _=sc.plot(*args,**kwds)
+        reverseXY = kwdPop( kwds, 'reverseXY', False )
+        if reverseXY:
+            return [ sc.plotT(*args,**kwds)
+                    for sc in self.subContours ]
+        else:
+            return [ sc.plot(*args,**kwds)
+                    for sc in self.subContours ]
+                
     
     def scPlotT(self,*args,**kwds):
         '''Plot the subContours in a way that can be overlaid on a transposed imshow
            (matches closely with diagramPlot in VFMLite)
            State: Access only'''
-        for sc in self.subContours:
-            _=sc.plotT(*args,**kwds)
+        kwds['reverseXY'] = True
+        return self.scPlot(*args,**kwds)
     
     def cellPlot(self,*args,**kwds):
         '''Plot the full contours in a way that can be overlaid on an imshow
