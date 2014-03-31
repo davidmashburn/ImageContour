@@ -80,6 +80,15 @@ def _prepColorsForColoredPlot(vals,kwds,MinMax=None):
                  for v in vals ]
     return colorList
 
+def drawColorbar(vals,MinMax=None,**kwds):
+    '''Use the same setup as _prepColorsForColoredPlot to instead make a
+       matplotlib colorbar'''
+    kwds['cmap'] = kwdPop( kwds, 'cmap', temperatureCmap ) # sets default value
+    Min,Max = _prepMinMaxForColoredPlot(vals,MinMax)
+    kwds['norm'] = mpl.colors.Normalize(Min, Max)
+    kwds['mappable'] = plt.cm.ScalarMappable(norm=kwds['norm'], cmap=kwds['cmap'])
+    kwds['mappable']._A = []
+    plt.colorbar(**kwds)
 
 class SubContour(object):
     '''A class to hold the data for a single SubContour (basically a connected list of points)
