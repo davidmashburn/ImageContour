@@ -3,6 +3,8 @@ from numpy import sqrt
 import matplotlib.pyplot as plt
 
 def GetBoundingRect(arr,val):
+    '''Get the minimum rectangle bounding val in the array arr
+       returns [minx,maxx],[miny,maxy]'''
     x,y=np.where(arr==val)
     return [min(x),max(x)],[min(y),max(y)]
 
@@ -45,6 +47,18 @@ def indA(arr,p):
         return 0
 
 def GetContourFromSubArray(subArr,realArr=None,offsets=None,getSubsections=False):
+    '''Take a boolean sub-array that has been tightly cropped around a value
+         and get the contour.
+       The cropping ensures that there is a value of 1 somewhere along
+         each edge of the array.
+       Uses a custom turn-tracking algorithm to trace the boundary.
+       
+       If getSubsections is True, the tracking also stores the values
+         just outside each pixel-pixel boundary.
+       
+       Returns contour,turns (and optionally contourVals if getSubsections is True)
+       
+       <more explanation needed>'''
     # Find the first nonzero value on row 0 and set the contour to the right
     for i,p in enumerate(subArr[0]):
         if p==1:
@@ -127,6 +141,9 @@ def GetContourFromSubArray(subArr,realArr=None,offsets=None,getSubsections=False
         return contour,turns
 
 def GetContour(arr,val,boundingRect=None,byNeighbor=False):
+    '''Build a contour around a set of values in an array
+       returns contour,turns,  if byNeighbor is True,
+       otherwise returns contour,turns'''
     if boundingRect==None:
         b=GetBoundingRect(arr,val)
     else:
