@@ -760,6 +760,21 @@ def GetCellNetworkFromFlatData(fdcn):
                             'contourOrderingByValue' : { int(k):v for k,v in fdcn['contourOrderingByValue'].iteritems() },
                             'allValues': fdcn['allValues'], } )
 
+def GetCellNetworkListStaticFromJsonFile(filename):
+    with open(filename) as fid:
+        cnListFlat = json.load(fid)
+    cnList = [ GetCellNetworkFromFlatData(fdcn)
+              for fdcn in cnListFlat ]
+    return cnList
+
+def GetCellNetworkListPrevNextFromJsonFile(filename):
+    with open(filename) as fid:
+        cnListPrevFlat,cnListNextFlat = json.load(fid)
+    cnListPrev,cnListNext = [ [ GetCellNetworkFromFlatData(fdcn)
+                               for fdcn in cnListFlat ]
+                             for cnListFlat in cnListPrevFlat,cnListNextFlat ]
+    return cnListPN
+
 def SubContourListfromCVLSList(cVLS_List,startPointValues_List=[],endPointValues_List=[]):
     '''Get a list of SubContour objects from an old list of cVLS's'''
     if startPointValues_List==[]:
