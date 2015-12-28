@@ -13,7 +13,7 @@ from collections import Counter
 
 import numpy as np
 
-from matplotlib import mpl
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 #from list_utils:
