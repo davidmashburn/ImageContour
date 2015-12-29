@@ -1,6 +1,6 @@
 import numpy as np
 
-from matplotlib import mpl
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 
 from np_utils import totuple
