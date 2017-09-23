@@ -239,7 +239,7 @@ def FindMatchesAndRemovals(scListA,scListB,searchInds=None):
     removeFromA = []
     removeFromB = []
     
-    if searchInds==None:
+    if searchInds is None:
         searchInds = range(len(scListA))
     
     for ind in searchInds:
@@ -391,9 +391,9 @@ def GetPairLengthsAndBadSpots(pairs,pairsByFrame,cVLSByFrame,tAx):
 #   2: In-between points can come and go willy-nilly!!
 def MakePolygonNetworkFromWaterSeg(waterArr,minSplit=30,allValsByFrame=None,cVLS=None):
     '''Go all the way from raw 2d+t array to an pointList,indexes format'''
-    if allValsByFrame==None:
+    if allValsByFrame is None:
         allValsByFrame = [ list(set(w.flat)) for w in waterArr ]
-    if cVLS==None:
+    if cVLS is None:
         cVLS = GetContourValuesLengthsAndSubContoursByFrame(waterArr,allValsByFrame)
     allPtsList = []
     allSegsList = []

@@ -144,7 +144,7 @@ def GetContour(arr,val,boundingRect=None,byNeighbor=False):
     '''Build a contour around a set of values in an array
        returns contour,turns,  if byNeighbor is True,
        otherwise returns contour,turns'''
-    if boundingRect==None:
+    if boundingRect is None:
         b=GetBoundingRect(arr,val)
     else:
         b=boundingRect

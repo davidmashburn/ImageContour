@@ -36,7 +36,7 @@ from temperatureCmaps import temperatureCmap,temperatureDarkCmap,temperatureLigh
 
 def GetValuesAroundSCPoint(watershed2d,point,wrapX=False,wrapY=False):
     vals = getValuesAroundPointInArray(watershed2d,point,wrapX,wrapY)
-    return ( tuple(vals.tolist()) if vals!=None else (None,None,None) )
+    return ( tuple(vals.tolist()) if vals is not None else (None,None,None) )
 
 def BreakLinesIntoEvenPieces(points,nSegments):
     '''Take the points from a multi-line and re-interpolate the
@@ -65,7 +65,7 @@ def _getReportPixel(arr):
     return report_pixel
 
 def _prepMinMaxForColoredPlot(vals,MinMax=None):
-    if MinMax==None:
+    if MinMax is None:
         mmin,mmax = minmax(deletecases(vals,[None]))
         MinMax = minmax([mmin,-mmin,mmax,-mmax])
     return MinMax
@@ -75,7 +75,7 @@ def _prepColorsForColoredPlot(vals,kwds,MinMax=None):
     Min,Max = _prepMinMaxForColoredPlot(vals,MinMax)
     norm = mpl.colors.Normalize(Min, Max)
     scalarMap = plt.cm.ScalarMappable(norm=norm, cmap=cmap)
-    colorList = [ ( None if v==None else
+    colorList = [ ( None if v is None else
                     scalarMap.to_rgba(v) )
                  for v in vals ]
     return colorList
@@ -405,12 +405,12 @@ class CellNetwork(object):
         scIndexMap = {}
         count = 0
         for i in range(len(self.subContours)):
-            if self.subContours[i]!=None:
+            if self.subContours[i] is not None:
                 scIndexMap[i] = count
                 count+=1
                 
         # Now go through and delete all the dead sc's
-        self.subContours = [ sc for sc in self.subContours if sc!=None ]
+        self.subContours = [ sc for sc in self.subContours if sc is not None ]
         
         # Now, go in and reindex contourOrderingByValue
         for v in self.contourOrderingByValue.keys():
@@ -455,7 +455,7 @@ class CellNetwork(object):
         
         # And now, replace occurrences of valuesToRemove in the sc.values by 1 (background) instead
         for sc in self.subContours:
-            if sc!=None:
+            if sc is not None:
                 len_intersect = len(set(sc.values).intersection(valuesToRemove))
                 if len_intersect==1:
                     sc.values = tuple(sorted([ (1 if v in valuesToRemove else v)
@@ -552,10 +552,10 @@ class CellNetwork(object):
             # Find all the subcountours that share triple junctions with the start and/or end points of scDel:
             connectedSCsToStart = [ (i,sc)
                                    for i,sc in enumerate(self.subContours)
-                                   if sc!=scDel and sc!=None and ( scDel.points[0] in [sc.points[0],sc.points[-1]] ) ]
+                                   if sc != scDel and sc is not None and ( scDel.points[0] in [sc.points[0],sc.points[-1]] ) ]
             connectedSCsToEnd = [ (i,sc)
                                  for i,sc in enumerate(self.subContours)
-                                 if sc!=scDel and sc!=None and ( scDel.points[-1] in [sc.points[0],sc.points[-1]] ) ]
+                                 if sc != scDel and sc is not None and ( scDel.points[-1] in [sc.points[0],sc.points[-1]] ) ]
             #print len(connectedSCsToStart),len(connectedSCsToEnd)
             
             for scDelPtInd,connectedSCs in ((0,connectedSCsToStart),(-1,connectedSCsToEnd)):
@@ -640,8 +640,8 @@ class CellNetwork(object):
             x = [ p[0]-0.5 for p in contourPoints[v] ]
             y = [ p[1]-0.5 for p in contourPoints[v] ]
             x,y = (y,x) if reverseXY else (x,y)
-            if colorList!=None:
-                if colorList[i]==None: # skip cells with no color
+            if colorList is not None:
+                if colorList[i] is None: # skip cells with no color
                     continue
                 kwds['color'] = colorList[i] # override the default color
             _=plotFunction( y,x, *args, **kwds )
@@ -677,7 +677,7 @@ class CellNetwork(object):
         
         plotList = []
         for color,sc in zip(colorList,self.subContours):
-            if color!=None:
+            if color is not None:
                 scplot = ( sc.plotT if reverseXY else sc.plot )
                 kwds['color'],kwds['linewidth'] = color,linewidth
                 plotList.append(  scplot(*args,**kwds)  )
@@ -718,7 +718,7 @@ class CellNetwork(object):
         rPlot = np.zeros(waterArr.shape,dtype=np.float)
         for i,v in enumerate(sorted(self.contourOrderingByValue.keys())):
             p,pErr = pressures[i],pressureErrors[i]
-            if p!=None:
+            if p is not None:
                 wh = np.where(waterArr==v)
                 nPts = len(wh[0])
                 rPlot[wh] = ( np.random.normal(p,pErr,nPts) if pErr!=0 else
@@ -796,7 +796,7 @@ def GetCellNetwork( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(0,0)
        allValues is optional and specifies which value in the array to include in the network
        bgVals are the values ignored as background (at least 0 should always be used)
        scale and offset define a non-rotational transform over the output points'''
-    if allValues==None:
+    if allValues is None:
         allValues = np.unique(watershed2d)
     allValues = np.array(allValues).tolist() # force numpy arrays to lists
     allValues = [ v for v in allValues if v not in bgVals ] # skip the background
@@ -916,7 +916,7 @@ def GetCellNetworkListWithLimitedPointsBetweenNodes(cellNetworkList,splitLength=
     allPairs = sorted(set( [ tuple(sc.values) for cn in cellNetworkList for sc in cn.subContours ] )) # Value pairs...
     
     # Build the numInteriorPointsDict:
-    if fixedNumInteriorPoints!=None:
+    if fixedNumInteriorPoints is not None:
         numInteriorPointsDict = { p:fixedNumInteriorPoints for p in allPairs }
     else:
         # minLength is the number of points of the shortest subcountour between cells p[0] and p[1] from all frames
@@ -1256,7 +1256,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
                       for i in waterArr ] # Skip background
     
     ### Ensure that this has enough elements, if not, add more empty lists
-    if extraRemoveValsByFrame==None:
+    if extraRemoveValsByFrame is None:
         extraRemoveValsByFrame = []
     
     # Ensure we got a list-of-lists for extraRemovalsByFrame
@@ -1355,7 +1355,7 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
                       for i in waterArr ] # Skip background
     
     # Ensure that this has enough elements, if not, add more empty lists
-    if extraRemoveValsByFrame==None:
+    if extraRemoveValsByFrame is None:
         extraRemoveValsByFrame = []
     
     # Ensure we got a list-of-lists for extraRemovalsByFrame
@@ -1676,7 +1676,7 @@ def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(
        '''
     arr = watershed2d # synonym
     cellIDs = deletecases( ( np.unique(arr)
-                             if allValues==None else         # rebuild allValues if None is passed
+                             if allValues is None else         # rebuild allValues if None is passed
                              np.array(allValues) ).tolist(), # force numpy array to list
                            bgVals )                          # remove background values
     
