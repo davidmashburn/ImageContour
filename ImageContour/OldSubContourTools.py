@@ -2,11 +2,14 @@
 '''Just the functions that are being kept for legacy purposes only...
    A number of the functions also don't work in the state they are in.'''
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 from copy import deepcopy
 
 import numpy as np
 
-import ImageContour
+from . import ImageContour
 
 
 #from list_utils:
@@ -208,7 +211,7 @@ def RemoveSubContour(scList,index,useSimpleRemoval=True,leaveTinyFlipFlopContour
                 connPtInd = ( 0 if s.points[0]==scDel.points[scDelPtInd] else -1 ) # it has to be either the start or the end of s
                 scList[i].points[connPtInd] = scDelMidpoint
     else:
-        print 'NOT IMPLEMENTED'
+        print('NOT IMPLEMENTED')
         return
         if leaveTinyFlipFlopContour:
             pass
@@ -240,7 +243,7 @@ def FindMatchesAndRemovals(scListA,scListB,searchInds=None):
     removeFromB = []
     
     if searchInds is None:
-        searchInds = range(len(scListA))
+        searchInds = list(range(len(scListA)))
     
     for ind in searchInds:
         sca = scListA[ind]
@@ -249,7 +252,7 @@ def FindMatchesAndRemovals(scListA,scListB,searchInds=None):
         matchInds,matches = zip(*matchTuples)
         
         if len(matches)==0:
-            print 'sc in A but not in B:', sca.values, matches
+            print('sc in A but not in B:', sca.values, matches)
             sp,ep = sca.startPointValues,sca.endPointValues
             # get the values connected to the subcontour only at the corners:
             opposingValues = tuple(sorted(list(set(sp).union(ep).difference(sca.values))))
@@ -258,19 +261,19 @@ def FindMatchesAndRemovals(scListA,scListB,searchInds=None):
             matchOppInds,matchesOpp = zip(*matchOppTuples)
             
             if matchesOpp==[]:
-                print 'Not Recoverable!'
+                print('Not Recoverable!')
             else:
-                print 'Recoverable: sc in A at index',ind,sca.values,'matches to sc in B at index',matchOppInds[0],matchesOpp[0].values
-                print scListA[ind]
+                print('Recoverable: sc in A at index',ind,sca.values,'matches to sc in B at index',matchOppInds[0],matchesOpp[0].values)
+                print(scListA[ind])
                 removeFromA.append(ind)            # actually DO the removals later so we don't muck up the indexing!
                 removeFromB.append(matchOppInds[0])
                 scsMatchedInB.append(matchOppInds[0])
                 
                 if len(matchesOpp)>1:
-                    print 'More than 1 match!'
+                    print('More than 1 match!')
             
         elif len(matches)>1:
-            print "sc in A matches multiple sc's in B:",sca.values,matches
+            print("sc in A matches multiple sc's in B:",sca.values,matches)
         else:
             scsMatchedInB.append(matchInds[0])
             
@@ -278,10 +281,10 @@ def FindMatchesAndRemovals(scListA,scListB,searchInds=None):
             # This stuff isn't really being used right now...
             sp1, sp2 = sca.startPointValues, matches[0].startPointValues
             if sp1!=sp2:
-                print "start points don't match",sp1,sp2
+                print("start points don't match",sp1,sp2)
             ep1, ep2 = sca.endPointValues, matches[0].endPointValues
             if ep1!=ep2:
-                print "end points don't match",ep1,ep2
+                print("end points don't match",ep1,ep2)
     
     return scsMatchedInB,removeFromA,removeFromB
 
@@ -341,20 +344,20 @@ def MakeMatchedCVLSFrames(scListByFrame,allValsByFrame,orderOfSCsByValueByFrame,
     pairsNext = [tuple(c[0]) for c in cVLSNext]
     
     if len(set(pairsPrev))!=len(pairsPrev):
-        print 'Frame',frames[0],'has more than one subcontour between the same cells!'
+        print('Frame',frames[0],'has more than one subcontour between the same cells!')
         #return
     if len(set(pairsNext))!=len(pairsNext):
-        print 'Frame',frames[1],'has more than one subcontour between the same cells!'
+        print('Frame',frames[1],'has more than one subcontour between the same cells!')
         #return
     
     differentSCs = set(pairsPrev).difference(pairsNext)
     if len(differentSCs)>0:
-        print "Different subcontours! The following sc's are not in both frames",tuple(frames),":"
-        print differentSCs
+        print("Different subcontours! The following sc's are not in both frames",tuple(frames),":")
+        print(differentSCs)
         #return
     
     if orderOfSCsByValueByFrame[frames[0]]!=orderOfSCsByValueByFrame[frames[1]]:
-        print "Subcontours are in a different order between frames",tuple(frames),"!"
+        print("Subcontours are in a different order between frames",tuple(frames),"!")
         #return
     
     
@@ -406,7 +409,7 @@ def MakePolygonNetworkFromWaterSeg(waterArr,minSplit=30,allValsByFrame=None,cVLS
         #subPtsOld = [ ([] if div[i]==0 else contours[i][ ::(len(contours[i])//div[i]) ]  )
         #          for i in range(nc) ]
         inds = [  ( [0,lc[i]-1] if (lc[i]-1 < 2*minSplit) else
-                    range(0,lc[i]-2,sep[i])+[lc[i]-1] )
+                    list(range(0,lc[i]-2,sep[i]))+[lc[i]-1] )
                 for i in range(nc)  ]
         
         subPts = [[ tuple(contours[i][j]) for j in inds[i] ] 

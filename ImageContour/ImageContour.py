@@ -1,3 +1,5 @@
+from __future__ import print_function
+
 import numpy as np
 from numpy import sqrt
 import matplotlib.pyplot as plt
@@ -107,7 +109,7 @@ def GetContourFromSubArray(subArr,realArr=None,offsets=None,getSubsections=False
             zerozy,onezy,R,L = NE,NW,SW,SE
         
         if indA(subArr,zerozy)!=0 and indA(subArr,onezy)!=1:
-            print 'contour should be 0 on the outside and 1 on the inside!!'
+            print('contour should be 0 on the outside and 1 on the inside!!')
             return
         
         if getSubsections:
@@ -131,7 +133,7 @@ def GetContourFromSubArray(subArr,realArr=None,offsets=None,getSubsections=False
         contour+=[addP(contour[-1],direction)]
         perimeter+=1
         if perimeter > 1000000:
-            print 'Error! Perimeter Should not be this large!!!'
+            print('Error! Perimeter Should not be this large!!!')
             return
     
     if getSubsections:
@@ -382,8 +384,8 @@ if __name__=='__main__':
                 [0,0,0,1,0],
                 [0,1,0,1,0],
                 [0,1,1,1,0]])
-    print GetIJPerimeter(z,1)
-    print GetIJPerimeter(q,1)
+    print(GetIJPerimeter(z,1))
+    print(GetIJPerimeter(q,1))
     plt.figure(1)
     PlotArrayAndContour(z,1)
     plt.figure(2)

@@ -2,6 +2,9 @@
 ''''A useful collection of tools to aid in manipulating contour networks
 This is admittedly less coherent/documented and more "bleeding edge" than ImageContour.py'''
 
+from __future__ import absolute_import
+from __future__ import print_function
+
 import os
 from copy import deepcopy
 #import cPickle # old pickle version
@@ -24,15 +27,15 @@ from np_utils import ( totuple, interp, interpGen, flatten, ziptranspose,
 #from gen_utils
 from np_utils import minmax
 #from func_utils
-from np_utils import compose,kwdPop
+from np_utils import compose, kwdPop, viewitems
 #from np_utils:
 from np_utils import ( polyArea, polyPerimeter, polyCentroid,
                        polyCirculationDirection,pointDistance,
                        limitInteriorPoints, limitInteriorPointsInterpolating,
                        addBorder, getValuesAroundPointInArray )
 
-import ImageContour
-from temperatureCmaps import temperatureCmap,temperatureDarkCmap,temperatureLightCmap
+from . import ImageContour
+from .temperatureCmaps import temperatureCmap,temperatureDarkCmap,temperatureLightCmap
 
 def GetValuesAroundSCPoint(watershed2d,point,wrapX=False,wrapY=False):
     vals = getValuesAroundPointInArray(watershed2d,point,wrapX,wrapY)
@@ -371,7 +374,7 @@ class CellNetwork(object):
         '''Get a list off subcontours (indexes) that belong to degenerate contours (either points or lines)'''
         problemSCs = set()
         problemVals = set()
-        for v,scInds in self.contourOrderingByValue.iteritems():
+        for v,scInds in viewitems(self.contourOrderingByValue):
             if len(scInds)<3:
                 scInds = [i[0] for i in scInds] # before, this also contained subcontour direction information
                 if sum([ self.subContours[i].numPoints-1 for i in scInds ]) < 3:
@@ -393,7 +396,7 @@ class CellNetwork(object):
         if checkForDegeneracy:
             problemVals,problemValuePairs = self.CheckForDegenerateContours()
             if problemVals!=[]:
-                print 'Values with degenerate contours:',problemVals
+                print('Values with degenerate contours:',problemVals)
                 raise DegenerateNetworkException('Degenerate contours (zero area) found between these cellIDs!'+repr(problemValuePairs))
     
     def CleanUpEmptySubContours(self):
@@ -461,7 +464,7 @@ class CellNetwork(object):
                     sc.values = tuple(sorted([ (1 if v in valuesToRemove else v)
                                               for v in sc.values]))
                 elif len_intersect==2:
-                    print 'Now how did that happen? We just filtered those out!'
+                    print('Now how did that happen? We just filtered those out!')
                     return
                 
                 startNew = set(sc.startPointValues).difference(valuesToRemove)
@@ -563,7 +566,7 @@ class CellNetwork(object):
                     connPtInd = ( 0 if s.points[0]==scDel.points[scDelPtInd] else -1 ) # it has to be either the start or the end of a sc
                     self.subContours[i].points[connPtInd] = scDelMidpoint
         else:
-            print 'NOT IMPLEMENTED'
+            print('NOT IMPLEMENTED')
             if leaveTinyFlipFlopContour:
                 pass
             else:
@@ -757,7 +760,7 @@ def GetCellNetworkFromFlatData(fdcn):
     
     return CellNetwork( **{ 'subContours' : [ SubContour(**j) for j in fdcn['subContours'] ],
                             'quadPoints' : [ QuadPoint(**j) for j in fdcn['quadPoints'] ],
-                            'contourOrderingByValue' : { int(k):v for k,v in fdcn['contourOrderingByValue'].iteritems() },
+                            'contourOrderingByValue' : { int(k):v for k,v in viewitems(fdcn['contourOrderingByValue']) },
                             'allValues': fdcn['allValues'], } )
 
 def GetCellNetworkListStaticFromJsonFile(filename):
@@ -772,7 +775,7 @@ def GetCellNetworkListPrevNextFromJsonFile(filename):
         cnListPrevFlat,cnListNextFlat = json.load(fid)
     cnListPrev,cnListNext = [ [ GetCellNetworkFromFlatData(fdcn)
                                for fdcn in cnListFlat ]
-                             for cnListFlat in cnListPrevFlat,cnListNextFlat ]
+                             for cnListFlat in (cnListPrevFlat,cnListNextFlat) ]
     return cnListPrev,cnListNext
 
 def SubContourListfromCVLSList(cVLS_List,startPointValues_List=[],endPointValues_List=[]):
@@ -934,15 +937,15 @@ def GetCellNetworkListWithLimitedPointsBetweenNodes(cellNetworkList,splitLength=
     if checkForDegeneracy:
         problemValsList,problemValuePairsList = ziptranspose([ cn.CheckForDegenerateContours() for cn in cellNetworkListNew ])
         if flatten(problemValsList)!=[]:
-            print 'All degenerate values:',sorted(set(flatten(problemValsList)))
-            print 'Degenerate values by frame:'
+            print('All degenerate values:',sorted(set(flatten(problemValsList))))
+            print('Degenerate values by frame:')
             for i,problemVals in enumerate(problemValsList):
                 if problemVals!=[]:
-                    print ' ',i,':',problemVals
-            print 'Degenerate contours (zero area) found between these cellIDs on these frames!'
+                    print(' ',i,':',problemVals)
+            print('Degenerate contours (zero area) found between these cellIDs on these frames!')
             for i,problemValuePairs in enumerate(problemValuePairsList):
                 if problemValuePairs!=[]:
-                    print ' ',i,':',problemValuePairs
+                    print(' ',i,':',problemValuePairs)
             raise DegenerateNetworkException('Degeneracy check failed!')
     
     return cellNetworkListNew
@@ -970,15 +973,15 @@ def GetCellNetworkListWithLimitedPointsBetweenNodes_FullInterpolation(cellNetwor
     if checkForDegeneracy:
         problemValsList,problemValuePairsList = ziptranspose([ cn.CheckForDegenerateContours() for cn in cellNetworkListNew ])
         if flatten(problemValsList)!=[]:
-            print 'All degenerate values:',sorted(set(flatten(problemValsList)))
-            print 'Degenerate values by frame:'
+            print('All degenerate values:',sorted(set(flatten(problemValsList))))
+            print('Degenerate values by frame:')
             for i,problemVals in enumerate(problemValsList):
                 if problemVals!=[]:
-                    print ' ',i,':',problemVals
-            print 'Degenerate contours (zero area) found between these cellIDs on these frames!'
+                    print(' ',i,':',problemVals)
+            print('Degenerate contours (zero area) found between these cellIDs on these frames!')
             for i,problemValuePairs in enumerate(problemValuePairsList):
                 if problemValuePairs!=[]:
-                    print ' ',i,':',problemValuePairs
+                    print(' ',i,':',problemValuePairs)
             raise DegenerateNetworkException('Degeneracy check failed!')
     
     return cellNetworkListNew
@@ -1019,15 +1022,15 @@ def GetMatchedCellNetworkListsWithLimitedPointsBetweenNodes(cellNetworkListPrev,
                                  for i in collectPreviousNextResults(problemValuePairsListPrev,problemValuePairsListNext) ]
         
         if flatten(problemValsList)!=[]:
-            print 'All degenerate values:',sorted(set(flatten(problemValsList)))
-            print 'Degenerate values by frame:'
+            print('All degenerate values:',sorted(set(flatten(problemValsList))))
+            print('Degenerate values by frame:')
             for i,problemVals in enumerate(problemValsList):
                 if problemVals!=[]:
-                    print ' ',i,':',problemVals
-            print 'Degenerate contours (zero area) found between these cellIDs on these frames!'
+                    print(' ',i,':',problemVals)
+            print('Degenerate contours (zero area) found between these cellIDs on these frames!')
             for i,problemValuePairs in enumerate(problemValuePairsList):
                 if problemValuePairs!=[]:
-                    print ' ',i,':',problemValuePairs
+                    print(' ',i,':',problemValuePairs)
             raise DegenerateNetworkException('Degeneracy check failed!')
     
     return cnListPrevNew,cnListNextNew
@@ -1083,7 +1086,7 @@ def FindMatchesAndRemovals(cnA,cnB):
     for nIntersections,multiFailString in [ ( 2, 'with the same start/end point values:' ),
                                             ( 1, 'with one common endpoint:'             ),
                                             ( 0, 'without common start/endpoints:'       ),]:
-        commonPairs = set(pairGroupsA.keys()).intersection(pairGroupsB.keys())
+        commonPairs = set(pairGroupsA.keys()).intersection(list(pairGroupsB.keys()))
         for pair in commonPairs:
             # Look for any and all connections (i,j) between pairGroupsA[pair] and pairGroupsB[pair]
             # each pair here is a successful match between a subcontour in A and another in B
@@ -1109,16 +1112,16 @@ def FindMatchesAndRemovals(cnA,cnB):
                 matchedA += matchA
                 matchedB += matchB
             elif len(matchInds)>1:
-                print 'Not recoverable'
-                print "sc's matches multiple sc's in opposing list " + multiFailString,pair,matchA,matchB
+                print('Not recoverable')
+                print("sc's matches multiple sc's in opposing list " + multiFailString,pair,matchA,matchB)
                 # Print more details...
-                print 'matchInds:',matchInds
+                print('matchInds:',matchInds)
                 for cn,matc,ABstr in [ (cnA,matchA,'A'),
                                        (cnB,matchB,'B'), ]:
                     scs = [ [sc.points[0],sc.points[-1],sc.startPointValues,sc.endPointValues]
                            for i in matc
                            for sc in (cn.subContours[i],) ] # loop over 1-element list; basically local variable assignment
-                    print 'Start/end coords/values for '+ABstr+':', scs
+                    print('Start/end coords/values for '+ABstr+':', scs)
                 
                 scA,scB = cnA.subContours[a],cnB.subContours[b]
                 notRecoverableA += matchA
@@ -1162,8 +1165,8 @@ def FindMatchesAndRemovals(cnA,cnB):
                     removeA += matchA
                     removeB += matchB
                 elif len(matchInds)>1:
-                    print 'Not recoverable'
-                    print "sc's matches multiple sc's in opposing list " + multiFailString,pair,matchA,matchB
+                    print('Not recoverable')
+                    print("sc's matches multiple sc's in opposing list " + multiFailString,pair,matchA,matchB)
                     notRecoverableA += matchA
                     notRecoverableB += matchB
     
@@ -1186,17 +1189,17 @@ def FindMatchesAndRemovals(cnA,cnB):
             if len(matchInds)==1:
                 removeX += match
             elif len(matchInds)>1:
-                print 'Not recoverable'
-                print "sc in "+name+" matches multiple 4-junctions in "+otherName+":",pair,match
+                print('Not recoverable')
+                print("sc in "+name+" matches multiple 4-junctions in "+otherName+":",pair,match)
                 notRecoverableX += match
     
     # Anything that didn't get matched (and then deleted) get flagged as notRecoverable
     remainingPairsA = flatten(pairGroupsA.values())
     remainingPairsB = flatten(pairGroupsB.values())
     if len(remainingPairsA)+len(remainingPairsB)>0:
-        print 'Not Recoverable! No matches found!'
-        print 'A:', [ (i,cnA.subContours[i].values) for i in remainingPairsA ]
-        print 'B:', [ (i,cnB.subContours[i].values) for i in remainingPairsB ]
+        print('Not Recoverable! No matches found!')
+        print('A:', [ (i,cnA.subContours[i].values) for i in remainingPairsA ])
+        print('B:', [ (i,cnB.subContours[i].values) for i in remainingPairsB ])
         notRecoverableA += remainingPairsA
         notRecoverableB += remainingPairsB
     
@@ -1222,10 +1225,10 @@ def GetMatchedCellNetworksCollapsing(cnA,cnB):
     matchedA,matchedB, removeA,removeB, notRecoverableA,notRecoverableB = FindMatchesAndRemovals(cnA,cnB)
     
     if len(notRecoverableA)+len(notRecoverableB) > 0:
-        print 'Summary of pairs that are not recoverable from A:',notRecoverableA
-        print 'Summary of pairs that are not recoverable from B:',notRecoverableB
+        print('Summary of pairs that are not recoverable from A:',notRecoverableA)
+        print('Summary of pairs that are not recoverable from B:',notRecoverableB)
     else:
-        print 'All pairs matched.'
+        print('All pairs matched.')
     
     cnA.RemoveMultipleSubContours(removeA)
     cnB.RemoveMultipleSubContours(removeB)
@@ -1271,21 +1274,21 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
     loadCnListFromFile = os.path.exists(cnListStaticFile) and not any(extraRemoveValsByFrame) and not forceRemake
     
     if loadCnListFromFile:
-        print 'Reloading cnLists from file:',cnListStaticFile
+        print('Reloading cnLists from file:',cnListStaticFile)
         
         # Load cnList from JSON file
         cnList = _loadCNListStaticFromJsonFile(cnListStaticFile)
         #cnList = cPickle.load(open(cnListStaticFile,'r')) # old pickle version
         
         if len(cnList)!=len(waterArr):
-            print 'cnList is the wrong length in the file:',cnListStaticFile
-            print 'Will remake them'
+            print('cnList is the wrong length in the file:',cnListStaticFile)
+            print('Will remake them')
             loadCnListFromFile=False
     if not loadCnListFromFile:
         ### The actual code that makes the cnList from scratch
         cnList = []
         for i in range(len(waterArr)):
-            print 'Generating CellNetwork for frame: %i' % i
+            print('Generating CellNetwork for frame: %i' % i)
             water = np.array(waterArr[i])
             valsToKeep = sorted( set(allValsByFrame[i]).difference(extraRemoveValsByFrame[i]) )
             for v in sorted(extraRemoveValsByFrame[i]):
@@ -1296,7 +1299,7 @@ def GetCellNetworkListStatic( waterArr,d,extraRemoveValsByFrame=None,forceRemake
         
         # Only save this if we're using all the values; otherwise it gets confusing!
         if not any(extraRemoveValsByFrame):
-            print 'Saving cnList to file:',cnListStaticFile
+            print('Saving cnList to file:',cnListStaticFile)
             # Save cnList to JSON file
             with open(cnListStaticFile,'w') as fid:
                 json.dump( [ GetFlatDataFromCellNetwork(cn) for cn in cnList ], fid )
@@ -1333,7 +1336,7 @@ def GetCVDListStatic( waterArr,d,useStaticAnalysis,
     cvdList = GetCVDListFromCellNetworkList(cnListLim)
     
     if usePlot:
-        print 'Plotting the subContours:'
+        print('Plotting the subContours:')
         cnList[0].scPlotT('r-')
         cnListLim[0].scPlotT('ro-')
     
@@ -1369,15 +1372,15 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
     loadCnListFromFile = os.path.exists(cnListPrevAndNextFile) and not any(extraRemoveValsByFrame) and not forceRemake
     
     if loadCnListFromFile:
-        print 'Reloading cnLists from file:',cnListPrevAndNextFile
+        print('Reloading cnLists from file:',cnListPrevAndNextFile)
         
         # Load cnListPrev and cnListNext from JSON file
         cnListPrev,cnListNext = _loadCNListPrevNextFromJsonFile(cnListPrevAndNextFile)
         #cnListPrev,cnListNext = cPickle.load(open(cnListPrevAndNextFile,'r')) # old pickle version
         
         if len(cnListPrev)!=len(waterArr)-1:
-            print 'cnLists are the wrong length in the file:',cnListPrevAndNextFile
-            print 'Will remake them'
+            print('cnLists are the wrong length in the file:',cnListPrevAndNextFile)
+            print('Will remake them')
             loadCnListFromFile=False
     
     allMatched = True
@@ -1388,7 +1391,7 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
         badFramePairs = []
         
         for i in range(len(waterArr)-1):
-            print 'Matching frames %i and %i' % (i,i+1)
+            print('Matching frames %i and %i' % (i,i+1))
             # create matched arrays first:
             waterA,waterB = np.array(waterArr[i]) , np.array(waterArr[i+1])
             extraRemovalsAB = set(extraRemoveValsByFrame[i]).union(extraRemoveValsByFrame[i+1])
@@ -1411,11 +1414,11 @@ def GetMatchedCellNetworkListsPrevNext( waterArr,d,extraRemoveValsByFrame=None,f
                 allMatched=False
                 badFramePairs.append( (i,i+1) )
         if not allMatched:
-            print 'Matching Errors! Will save cnLists to file, but these frames did not match:'
-            print badFramePairs
+            print('Matching Errors! Will save cnLists to file, but these frames did not match:')
+            print(badFramePairs)
         if not any(extraRemoveValsByFrame):
             # Only save this if we're using all the values; otherwise it gets confusing!
-            print 'Saving cnLists to file:',cnListPrevAndNextFile
+            print('Saving cnLists to file:',cnListPrevAndNextFile)
             
             # Save cnListPrev and cnListNext to JSON file
             with open(cnListPrevAndNextFile,'w') as fid:
@@ -1455,7 +1458,7 @@ def GetMatchedCVDListPrevNext( waterArr,d,useStaticAnalysis,
     cvdListNext = GetCVDListFromCellNetworkList(cnListNextLim)
     
     if usePlot:
-        print 'Plotting the subContours:'
+        print('Plotting the subContours:')
         cnListPrev[0].scPlotT('r-')
         cnListNext[0].scPlotT('b-')
         cnListPrevLim[0].scPlotT('ro-')
@@ -1599,7 +1602,7 @@ def GetEdgeGroups(edges,valuePairs,eliminateSameCellBoundaries=True):
        on either side are acutally the same; this should only occur at wrapped edges.'''
     edgeGroups = groupByFunction( zip(edges.tolist(),np.sort(valuePairs).tolist()),
                                   compose(tuple,itemgetter(1)), itemgetter(0) )
-    return ( { k:v for k,v in edgeGroups.iteritems() if k[0]!=k[1] }
+    return ( { k:v for k,v in viewitems(edgeGroups) if k[0]!=k[1] }
              if eliminateSameCellBoundaries else
              edgeGroups )
 
@@ -1643,7 +1646,7 @@ def GetContourOrderingByValue(cellIDs,subContourValues,subContourPoints):
         if chainDirection==-1:
             scOrder = scOrder[::-1]
             scDirection = [ (not i) for i in scDirection ][::-1]
-        contourOrderingByValue[cellID] = zip(scOrder,scDirection)
+        contourOrderingByValue[cellID] = list(zip(scOrder,scDirection))
     return contourOrderingByValue
 
 
@@ -1704,7 +1707,7 @@ def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(
     cellBoundariesMulti = { k:getChainsFromConnections( getElementConnections(totuple(v)) )
                             for k,v in edgeGroups.items() }
     assert all( len(i)==1 for i in cellBoundariesMulti.values() ),'Some cells touch in multiple places'
-    cellBoundaries = { k:v[0] for k,v in cellBoundariesMulti.iteritems() } # We should be able to deal with one chain per cell pair
+    cellBoundaries = { k:v[0] for k,v in viewitems(cellBoundariesMulti) } # We should be able to deal with one chain per cell pair
     scPtsByPairID = cellBoundaries
     if collapsePoles:
         # Eliminate all edges on the poles:
@@ -1715,9 +1718,9 @@ def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(
                                          p )
                                       for p in pts ]
         scPtsByPairID = { k : removeAdjacentDuplicates(_collapsePoles(pts))
-                         for k,pts in scPtsByPairID.iteritems() }
+                         for k,pts in viewitems(scPtsByPairID) }
     if deleteZeroContours:
-        scPtsByPairID = { k:pts for k,pts in scPtsByPairID.iteritems()
+        scPtsByPairID = { k:pts for k,pts in viewitems(scPtsByPairID)
                                 if 0 not in k }
 
     subContourValues,subContourPoints = ziptranspose(scPtsByPairID.items())
@@ -1774,7 +1777,7 @@ def getPointsEdgesCellsFromCellNetwork(cn,arr):
     orderedPointIDsByCell = { k:[ pindDict[tuple(i)]
                                  for i in v ]
                              for k,v in orderedPointsByCell.items() }
-    pointPairsByCell = { k:map(tuple,map(sorted,zip(v,roll(v))))
+    pointPairsByCell = { k:list(map(tuple,map(sorted,zip(v,roll(v)))))
                         for k,v in orderedPointIDsByCell.items() }
     edgesByCell = [ [k,[ eindDict[i]
                        for i in v
@@ -1784,7 +1787,7 @@ def getPointsEdgesCellsFromCellNetwork(cn,arr):
                  for k,v in pointPairsByCell.items()
                  for i in v
                  if i not in eindDict ]
-    print BAD_PAIRS, 'Not sure why these are here... ignored for the time being!'
+    print(BAD_PAIRS, 'Not sure why these are here... ignored for the time being!')
     
     return allPoints,allEdgesAsPtIDs,allCellsAsEdgeIDs
 
