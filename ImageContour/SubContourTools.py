@@ -27,7 +27,7 @@ from np_utils import ( totuple, interp, interpGen, flatten, ziptranspose,
 #from gen_utils
 from np_utils import minmax
 #from func_utils
-from np_utils import compose, kwdPop, viewitems
+from np_utils import compose, kwdPop
 #from np_utils:
 from np_utils import ( polyArea, polyPerimeter, polyCentroid,
                        polyCirculationDirection,pointDistance,
@@ -374,7 +374,7 @@ class CellNetwork(object):
         '''Get a list off subcontours (indexes) that belong to degenerate contours (either points or lines)'''
         problemSCs = set()
         problemVals = set()
-        for v,scInds in viewitems(self.contourOrderingByValue):
+        for v,scInds in self.contourOrderingByValue.items():
             if len(scInds)<3:
                 scInds = [i[0] for i in scInds] # before, this also contained subcontour direction information
                 if sum([ self.subContours[i].numPoints-1 for i in scInds ]) < 3:
@@ -760,7 +760,7 @@ def GetCellNetworkFromFlatData(fdcn):
     
     return CellNetwork( **{ 'subContours' : [ SubContour(**j) for j in fdcn['subContours'] ],
                             'quadPoints' : [ QuadPoint(**j) for j in fdcn['quadPoints'] ],
-                            'contourOrderingByValue' : { int(k):v for k,v in viewitems(fdcn['contourOrderingByValue']) },
+                            'contourOrderingByValue' : { int(k):v for k,v in fdcn['contourOrderingByValue'].items() },
                             'allValues': fdcn['allValues'], } )
 
 def GetCellNetworkListStaticFromJsonFile(filename):
@@ -1602,7 +1602,7 @@ def GetEdgeGroups(edges,valuePairs,eliminateSameCellBoundaries=True):
        on either side are acutally the same; this should only occur at wrapped edges.'''
     edgeGroups = groupByFunction( zip(edges.tolist(),np.sort(valuePairs).tolist()),
                                   compose(tuple,itemgetter(1)), itemgetter(0) )
-    return ( { k:v for k,v in viewitems(edgeGroups) if k[0]!=k[1] }
+    return ( { k:v for k,v in edgeGroups.items() if k[0]!=k[1] }
              if eliminateSameCellBoundaries else
              edgeGroups )
 
@@ -1707,7 +1707,7 @@ def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(
     cellBoundariesMulti = { k:getChainsFromConnections( getElementConnections(totuple(v)) )
                             for k,v in edgeGroups.items() }
     assert all( len(i)==1 for i in cellBoundariesMulti.values() ),'Some cells touch in multiple places'
-    cellBoundaries = { k:v[0] for k,v in viewitems(cellBoundariesMulti) } # We should be able to deal with one chain per cell pair
+    cellBoundaries = { k:v[0] for k,v in cellBoundariesMulti.items() } # We should be able to deal with one chain per cell pair
     scPtsByPairID = cellBoundaries
     if collapsePoles:
         # Eliminate all edges on the poles:
@@ -1718,9 +1718,9 @@ def GetCellNetwork_NEW( watershed2d,allValues=None,bgVals=(0,1),scale=1,offset=(
                                          p )
                                       for p in pts ]
         scPtsByPairID = { k : removeAdjacentDuplicates(_collapsePoles(pts))
-                         for k,pts in viewitems(scPtsByPairID) }
+                         for k,pts in scPtsByPairID.items() }
     if deleteZeroContours:
-        scPtsByPairID = { k:pts for k,pts in viewitems(scPtsByPairID)
+        scPtsByPairID = { k:pts for k,pts in scPtsByPairID.items()
                                 if 0 not in k }
 
     subContourValues,subContourPoints = ziptranspose(scPtsByPairID.items())
