@@ -386,7 +386,14 @@ class CellNetwork(object):
         """Go through the values in all the subContours and collect a list of all of them
         State: Changes state of allValues, but only to to be more consistent"""
         self.allValues = sorted(
-            set([v for sc in self.subContours for v in sc.values if v not in bgVals])
+            set(
+                [
+                    int(v)
+                    for sc in self.subContours
+                    for v in sc.values
+                    if v not in bgVals
+                ]
+            )
         )
 
     def GetAllValues(self, update=True, bgVals=(0, 1)):
@@ -433,8 +440,15 @@ class CellNetwork(object):
         This ordering helps ensure that matched CN's translate properly to
         matched cvd's
         State: Access only"""
+
+        def _trytolist(x):
+            try:
+                return x.tolist()
+            except AttributeError:
+                return x
+
         return removeDuplicates(
-            [tuple(pt) for sc in self.subContours for pt in sc.points]
+            [tuple(_trytolist(pt)) for sc in self.subContours for pt in sc.points]
         )
 
     def GetAllPointsSorted(self):
@@ -1100,7 +1114,7 @@ def GetDanglingBoundaryCells(cn, bgVals):
 
 
 def GetCellNetworkWithCellsRemoved(cn, cellsToRemove, bgVals):
-    """ 'Replace cells with holes in a copy of cn"""
+    """Replace cells with holes in a copy of cn"""
     cnClip = deepcopy(cn)
 
     # Make the new set of background values including the cells to remove
