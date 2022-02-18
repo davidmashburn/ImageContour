@@ -4,4 +4,4 @@ from .ImageContour import *
 from . import SubContourTools
 from ._version import *
 
-__all__ = ['ImageContour','SubContourTools']
+__all__ = ["ImageContour", "SubContourTools"]
